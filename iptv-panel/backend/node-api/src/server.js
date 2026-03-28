@@ -10,6 +10,7 @@ const path = require('path');
 const logger = require('./config/logger');
 const { apiLimiter } = require('./middleware/rateLimiter');
 const { ipFilter } = require('./middleware/ipFilter');
+const { antiScan, deviceDetect, securityHeaders } = require('./middleware/security');
 const { setupWebSocket } = require('./websocket/statsServer');
 const { startCronJobs } = require('./utils/cronJobs');
 
@@ -59,6 +60,11 @@ app.use(morgan('combined', {
   skip: (req) => req.url === '/health'
 }));
 
+// Security hardening
+app.use(securityHeaders);
+app.use(antiScan);
+app.use(deviceDetect);
+
 // IP filter (applied to all routes)
 app.use(ipFilter);
 
@@ -84,12 +90,12 @@ app.use('/api/series', apiLimiter, seriesRoutes);
 app.use('/api/epg', apiLimiter, epgRoutes);
 app.use('/api/admin', apiLimiter, adminRoutes);
 
-// Stream proxy endpoint (live/vod/series URL handling)
+// Stream proxy endpoint cu detecție device (v2)
 app.get([
   '/live/:username/:password/:streamId',
   '/movie/:username/:password/:streamId',
   '/series/:username/:password/:streamId'
-], require('./routes/streamProxy'));
+], require('./routes/streamProxyV2'));
 
 // 404 handler
 app.use((req, res) => {

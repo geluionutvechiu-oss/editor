@@ -12,6 +12,8 @@ const schema = z.object({
   password: z.string().min(6).max(128).optional().or(z.literal('')),
   email: z.string().email().optional().or(z.literal('')),
   max_connections: z.coerce.number().int().min(1).max(100).default(1),
+  max_mobile_connections: z.coerce.number().int().min(1).max(100).default(1),
+  max_stb_connections: z.coerce.number().int().min(1).max(100).default(1),
   exp_date: z.string().optional().or(z.literal('')),
   is_active: z.boolean().default(true),
   is_banned: z.boolean().default(false),
@@ -40,6 +42,8 @@ export function UserModal({ user, onClose, onSave }: Props) {
     defaultValues: user ? {
       email: user.email || '',
       max_connections: user.max_connections || 1,
+      max_mobile_connections: user.max_mobile_connections || 1,
+      max_stb_connections: user.max_stb_connections || 1,
       exp_date: user.exp_date ? user.exp_date.substring(0, 10) : '',
       is_active: user.is_active,
       is_banned: user.is_banned,
@@ -48,6 +52,8 @@ export function UserModal({ user, onClose, onSave }: Props) {
       notes: user.notes || ''
     } : {
       max_connections: 1,
+      max_mobile_connections: 1,
+      max_stb_connections: 1,
       is_active: true,
       is_banned: false
     }
@@ -129,19 +135,37 @@ export function UserModal({ user, onClose, onSave }: Props) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Max Connections
+                Max Conexiuni Desktop
               </label>
               <input
                 {...register('max_connections')}
-                type="number"
-                min={1}
-                max={100}
+                type="number" min={1} max={100}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-transparent dark:text-white focus:ring-2 focus:ring-indigo-500"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Expiry Date
+                Max Conexiuni Mobile 📱
+              </label>
+              <input
+                {...register('max_mobile_connections')}
+                type="number" min={1} max={100}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-transparent dark:text-white focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Max Conexiuni Smart TV 📺
+              </label>
+              <input
+                {...register('max_stb_connections')}
+                type="number" min={1} max={100}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-transparent dark:text-white focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Data expirare
               </label>
               <input
                 {...register('exp_date')}
