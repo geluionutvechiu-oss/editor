@@ -1,0 +1,40 @@
+{
+  "name": "iptv-panel-api",
+  "version": "1.0.0",
+  "description": "IPTV Management Panel - Node.js API",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "pm2": "pm2 start src/server.js --name iptv-api -i max"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
+    "express-validator": "^7.0.1",
+    "mysql2": "^3.6.5",
+    "ioredis": "^5.3.2",
+    "jsonwebtoken": "^9.0.2",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "compression": "^1.7.4",
+    "ws": "^8.16.0",
+    "axios": "^1.6.2",
+    "node-cron": "^3.0.3",
+    "uuid": "^9.0.0",
+    "multer": "^1.4.5-lts.1",
+    "morgan": "^1.10.0",
+    "dotenv": "^16.3.1",
+    "winston": "^3.11.0",
+    "fast-xml-parser": "^4.3.2",
+    "m3u-parser-generator": "^1.2.6",
+    "geoip-lite": "^1.4.10",
+    "node-fetch": "^3.3.2",
+    "ping": "^0.4.4",
+    "dayjs": "^1.11.10"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}
