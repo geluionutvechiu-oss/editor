@@ -141,7 +141,8 @@ if [ -f "$REPO_ROOT/docker/docker-compose.yml" ]; then
 else
     info "Cloning from GitHub..."
     # Update this URL to your actual repo
-    git clone --depth=1 https://github.com/geluionutvechiu-oss/editor.git /tmp/iptv-repo
+    git clone --depth=1 -b claude/iptv-management-panel-BKHIa \
+        https://github.com/geluionutvechiu-oss/editor.git /tmp/iptv-repo
     cp -r /tmp/iptv-repo/iptv-panel/* "$INSTALL_DIR"/
     rm -rf /tmp/iptv-repo
 fi
