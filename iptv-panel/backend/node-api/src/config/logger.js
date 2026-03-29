@@ -28,10 +28,11 @@ const logger = winston.createLogger({
   ]
 });
 
-if (process.env.NODE_ENV !== 'production') {
-  logger.add(new winston.transports.Console({
-    format: combine(colorize(), simple())
-  }));
-}
+// Scrie intotdeauna in consolă (necesar pentru docker logs)
+logger.add(new winston.transports.Console({
+  format: process.env.NODE_ENV !== 'production'
+    ? combine(colorize(), simple())
+    : combine(timestamp({ format: 'HH:mm:ss' }), simple())
+}));
 
 module.exports = logger;
