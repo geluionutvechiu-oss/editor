@@ -1,249 +1,219 @@
 #!/bin/bash
 # =============================================================
-# IPTV Panel - One-Click Install Script for Ubuntu 20.04/22.04
-# Usage: curl -sSL https://raw.githubusercontent.com/YOUR_REPO/main/iptv-panel/scripts/install.sh | bash
+# IPTV Panel - One-Click Install Script Ubuntu 20.04/22.04/24.04
 # =============================================================
-
 set -e
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-NC='\033[0m' # No Color
-BOLD='\033[1m'
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
+BLUE='\033[0;34m'; CYAN='\033[0;36m'; NC='\033[0m'; BOLD='\033[1m'
 
-log() { echo -e "${GREEN}[✓]${NC} $1"; }
+log()  { echo -e "${GREEN}[✓]${NC} $1"; }
 warn() { echo -e "${YELLOW}[!]${NC} $1"; }
-error() { echo -e "${RED}[✗]${NC} $1"; exit 1; }
+err()  { echo -e "${RED}[✗]${NC} $1"; exit 1; }
 info() { echo -e "${BLUE}[i]${NC} $1"; }
 step() { echo -e "\n${BOLD}${CYAN}==> $1${NC}"; }
 
 echo ""
 echo -e "${BOLD}${BLUE}╔══════════════════════════════════════════╗${NC}"
 echo -e "${BOLD}${BLUE}║        IPTV Management Panel             ║${NC}"
-echo -e "${BOLD}${BLUE}║     Production Install Script v1.0       ║${NC}"
+echo -e "${BOLD}${BLUE}║     Production Install Script v2.0       ║${NC}"
 echo -e "${BOLD}${BLUE}╚══════════════════════════════════════════╝${NC}"
 echo ""
 
-# Check root
-if [ "$EUID" -ne 0 ]; then
-    error "Please run as root: sudo bash install.sh"
-fi
-
-# Check OS
-if ! command -v lsb_release &>/dev/null; then
-    error "lsb_release not found. Unsupported OS."
-fi
-
-OS_ID=$(lsb_release -si)
-OS_VERSION=$(lsb_release -sr)
-
-if [[ "$OS_ID" != "Ubuntu" && "$OS_ID" != "Debian" ]]; then
-    warn "This script is tested on Ubuntu/Debian. Proceeding anyway..."
-fi
-
-# Check available RAM
-TOTAL_RAM=$(free -m | awk '/Mem:/ {print $2}')
-if [ "$TOTAL_RAM" -lt 1024 ]; then
-    warn "Less than 1GB RAM detected (${TOTAL_RAM}MB). Recommended: 2GB+"
-fi
+[ "$EUID" -ne 0 ] && err "Rulează ca root: sudo bash install.sh"
 
 # =============================================================
-# STEP 1: Get Configuration
+# STEP 1: Configurare
 # =============================================================
-step "Configuration"
+step "Configurare"
 
 INSTALL_DIR="/opt/iptv-panel"
-echo ""
+DEFAULT_IP=$(hostname -I | awk '{print $1}')
 
-# Panel domain
-read -p "Enter your server's domain or IP address [$(curl -s ifconfig.me 2>/dev/null || echo 'your-ip')]: " PANEL_DOMAIN
-PANEL_DOMAIN=${PANEL_DOMAIN:-$(curl -s ifconfig.me 2>/dev/null || echo 'localhost')}
+read -p "IP sau domeniu server [$DEFAULT_IP]: " PANEL_DOMAIN
+PANEL_DOMAIN=${PANEL_DOMAIN:-$DEFAULT_IP}
 
-# Admin credentials
-read -p "Admin username [admin]: " ADMIN_USER
+read -p "Username admin [admin]: " ADMIN_USER
 ADMIN_USER=${ADMIN_USER:-admin}
 
 while true; do
-    read -sp "Admin password (min 8 chars): " ADMIN_PASS
+    read -sp "Parola admin (min 8 caractere): " ADMIN_PASS
     echo ""
-    if [ ${#ADMIN_PASS} -ge 8 ]; then break
-    else warn "Password must be at least 8 characters"; fi
+    [ ${#ADMIN_PASS} -ge 8 ] && break
+    warn "Parola trebuie sa aiba minim 8 caractere"
 done
 
-# TMDB API Key
-read -p "TMDB API Key (optional, for movie metadata) [skip]: " TMDB_KEY
+read -p "TMDB API Key (optional, pentru metadata filme) [skip]: " TMDB_KEY
 TMDB_KEY=${TMDB_KEY:-}
 
-# Generate random secrets
-DB_PASSWORD=$(openssl rand -base64 24 | tr -dc 'a-zA-Z0-9' | head -c 24)
-REDIS_PASSWORD=$(openssl rand -base64 16 | tr -dc 'a-zA-Z0-9' | head -c 16)
-JWT_SECRET=$(openssl rand -base64 64 | tr -dc 'a-zA-Z0-9' | head -c 64)
-MYSQL_ROOT_PASSWORD=$(openssl rand -base64 24 | tr -dc 'a-zA-Z0-9' | head -c 24)
+# Generare parole random
+DB_PASSWORD=$(openssl rand -hex 16)
+REDIS_PASSWORD=$(openssl rand -hex 12)
+JWT_SECRET=$(openssl rand -hex 32)
+MYSQL_ROOT_PASSWORD=$(openssl rand -hex 16)
 
-log "Configuration collected"
+log "Configurare completata"
 
 # =============================================================
-# STEP 2: Install Dependencies
+# STEP 2: Dependinte sistem
 # =============================================================
-step "Installing system dependencies"
+step "Instalare dependinte sistem"
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y -qq \
-    curl wget git openssl ca-certificates \
-    gnupg lsb-release apt-transport-https \
-    software-properties-common net-tools
+apt-get install -y -qq curl wget git openssl ca-certificates \
+    gnupg lsb-release apt-transport-https software-properties-common
 
-log "System dependencies installed"
+log "Dependinte instalate"
 
 # =============================================================
-# STEP 3: Install Docker
+# STEP 3: Docker
 # =============================================================
-step "Installing Docker"
+step "Verificare/Instalare Docker"
 
-if command -v docker &>/dev/null; then
-    log "Docker already installed: $(docker --version)"
-else
+if ! command -v docker &>/dev/null; then
+    info "Instalare Docker..."
     curl -fsSL https://get.docker.com | sh
     systemctl enable --now docker
-    log "Docker installed: $(docker --version)"
-fi
-
-if ! command -v docker compose &>/dev/null; then
-    DOCKER_COMPOSE_VERSION="2.24.5"
-    curl -SL "https://github.com/docker/compose/releases/download/v${DOCKER_COMPOSE_VERSION}/docker-compose-linux-x86_64" \
-        -o /usr/local/bin/docker-compose
-    chmod +x /usr/local/bin/docker-compose
-    ln -sf /usr/local/bin/docker-compose /usr/bin/docker-compose
-fi
-
-log "Docker Compose: $(docker compose version 2>/dev/null || docker-compose --version)"
-
-# =============================================================
-# STEP 4: Clone / Copy Project
-# =============================================================
-step "Setting up project files"
-
-if [ ! -d "$INSTALL_DIR" ]; then
-    mkdir -p "$INSTALL_DIR"
-fi
-
-# If running from within the repo, copy files
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(dirname "$SCRIPT_DIR")"
-
-if [ -f "$REPO_ROOT/docker/docker-compose.yml" ]; then
-    info "Copying from local repo..."
-    cp -r "$REPO_ROOT"/* "$INSTALL_DIR"/
+    log "Docker instalat: $(docker --version)"
 else
-    info "Cloning from GitHub..."
-    # Update this URL to your actual repo
-    git clone --depth=1 -b claude/iptv-management-panel-BKHIa \
-        https://github.com/geluionutvechiu-oss/editor.git /tmp/iptv-repo
-    cp -r /tmp/iptv-repo/iptv-panel/* "$INSTALL_DIR"/
-    rm -rf /tmp/iptv-repo
+    log "Docker deja instalat: $(docker --version)"
 fi
 
-log "Project files ready at $INSTALL_DIR"
+# Verifica docker compose (plugin v2)
+if docker compose version &>/dev/null 2>&1; then
+    log "Docker Compose: $(docker compose version)"
+else
+    info "Instalare Docker Compose plugin..."
+    mkdir -p /usr/local/lib/docker/cli-plugins
+    COMPOSE_VER="2.24.5"
+    curl -SL "https://github.com/docker/compose/releases/download/v${COMPOSE_VER}/docker-compose-linux-x86_64" \
+        -o /usr/local/lib/docker/cli-plugins/docker-compose
+    chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+    log "Docker Compose instalat"
+fi
 
 # =============================================================
-# STEP 5: Generate .env file
+# STEP 4: Fisiere proiect
 # =============================================================
-step "Creating environment configuration"
+step "Pregatire fisiere proiect"
 
-cat > "$INSTALL_DIR/docker/.env" << EOF
-# Generated by install.sh on $(date)
-# ============================================================
+# Curata instalare veche daca exista
+if [ -d "$INSTALL_DIR" ]; then
+    warn "Director existent gasit. Curatare..."
+    # Opreste containere daca ruleaza
+    if [ -f "$INSTALL_DIR/docker/docker-compose.yml" ]; then
+        cd "$INSTALL_DIR/docker" && docker compose down -v 2>/dev/null || true
+    fi
+    rm -rf "$INSTALL_DIR"
+fi
+mkdir -p "$INSTALL_DIR"
 
-# Panel Configuration
+# Cloneaza din GitHub
+info "Descarcare cod din GitHub..."
+rm -rf /tmp/iptv-repo
+git clone --depth=1 -b claude/iptv-management-panel-BKHIa \
+    https://github.com/geluionutvechiu-oss/editor.git /tmp/iptv-repo
+cp -r /tmp/iptv-repo/iptv-panel/* "$INSTALL_DIR"/
+rm -rf /tmp/iptv-repo
+
+log "Fisiere pregatite la $INSTALL_DIR"
+
+# =============================================================
+# STEP 5: Fisier .env
+# =============================================================
+step "Creare configuratie .env"
+
+cat > "$INSTALL_DIR/docker/.env" << ENVEOF
 PANEL_DOMAIN=${PANEL_DOMAIN}
 PANEL_URL=http://${PANEL_DOMAIN}
-
-# Database
 MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
 DB_NAME=iptv_panel
 DB_USER=iptv_user
 DB_PASSWORD=${DB_PASSWORD}
-
-# Redis
 REDIS_PASSWORD=${REDIS_PASSWORD}
-
-# Security
 JWT_SECRET=${JWT_SECRET}
-
-# API Keys
 TMDB_API_KEY=${TMDB_KEY}
-EOF
+CORS_ORIGINS=http://${PANEL_DOMAIN}
+ENVEOF
 
 chmod 600 "$INSTALL_DIR/docker/.env"
-log ".env file created"
+log "Fisier .env creat"
 
 # =============================================================
-# STEP 6: Build and Start Services
+# STEP 6: Build imagini Docker
 # =============================================================
-step "Building Docker images (this may take 5-10 minutes)"
+step "Build imagini Docker (5-15 minute)..."
 
 cd "$INSTALL_DIR/docker"
-docker compose --env-file .env build --no-cache 2>&1 | tail -20
-log "Images built"
 
-step "Starting services"
+docker compose --env-file .env build --no-cache
+log "Imagini construite"
+
+# =============================================================
+# STEP 7: Pornire servicii
+# =============================================================
+step "Pornire servicii"
+
 docker compose --env-file .env up -d
+log "Containere pornite"
 
-log "Waiting for MySQL to initialize (90 seconds)..."
-sleep 90
-
-# Wait until MySQL actually accepts connections
-MAX_WAIT=120
+# Asteapta MySQL sa fie gata (polling activ)
+info "Asteptare initializare MySQL..."
+MAX_WAIT=180
 WAITED=0
-until docker compose --env-file .env exec -T mysql mysqladmin ping -h localhost -u root -p"${MYSQL_ROOT_PASSWORD}" --silent 2>/dev/null; do
-    sleep 5
-    WAITED=$((WAITED + 5))
-    if [ "$WAITED" -ge "$MAX_WAIT" ]; then
-        warn "MySQL timeout - trying anyway..."
+while [ $WAITED -lt $MAX_WAIT ]; do
+    if docker compose --env-file .env exec -T mysql \
+        mysql -u iptv_user -p"${DB_PASSWORD}" iptv_panel \
+        -e "SELECT 1;" &>/dev/null 2>&1; then
+        log "MySQL gata!"
         break
     fi
+    sleep 5
+    WAITED=$((WAITED + 5))
+    echo -n "."
 done
+echo ""
+
+if [ $WAITED -ge $MAX_WAIT ]; then
+    warn "MySQL timeout dupa ${MAX_WAIT}s. Continuam oricum..."
+fi
 
 # =============================================================
-# STEP 7: Create Admin User
+# STEP 8: Creare user admin
 # =============================================================
-step "Creating admin user"
+step "Creare user admin"
 
-# Generate bcrypt hash via python container
-HASH=$(docker compose --env-file .env exec -T python-epg python3 -c \
-    "import bcrypt; print(bcrypt.hashpw(b'${ADMIN_PASS}', bcrypt.gensalt(12)).decode())" 2>/dev/null)
+# Genereaza hash bcrypt
+HASH=$(docker compose --env-file .env exec -T python-epg \
+    python3 -c "import bcrypt; print(bcrypt.hashpw(b'${ADMIN_PASS}', bcrypt.gensalt(12)).decode())" \
+    2>/dev/null | tr -d '\r\n')
 
 if [ -z "$HASH" ]; then
-    warn "Could not generate hash, using default password 'Admin@1234'"
+    warn "Nu s-a putut genera hash. Se foloseste parola implicita Admin@1234"
     HASH='$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TiGY1JwKhRrGJl8X4NwN5C5GBKKG'
 fi
 
-docker compose --env-file .env exec -T mysql mysql \
-    -u root -p"${MYSQL_ROOT_PASSWORD}" iptv_panel \
-    -e "INSERT INTO users (username, password, role, is_active, exp_date, max_connections) VALUES ('${ADMIN_USER}', '${HASH}', 'admin', 1, NULL, 10) ON DUPLICATE KEY UPDATE password='${HASH}';" 2>&1
-
-if [ $? -eq 0 ]; then
-    log "Admin user '${ADMIN_USER}' created"
-else
-    warn "Admin user creation failed - run manually after install:"
-    warn "  cd /opt/iptv-panel/docker && docker compose exec mysql mysql -u root -p"
-fi
+# Foloseste iptv_user (nu root) - mai sigur si mai portabil
+docker compose --env-file .env exec -T mysql \
+    mysql -u iptv_user -p"${DB_PASSWORD}" iptv_panel -e \
+    "INSERT INTO users (username, password, role, is_active, max_connections)
+     VALUES ('${ADMIN_USER}', '${HASH}', 'admin', 1, 10)
+     ON DUPLICATE KEY UPDATE password='${HASH}', role='admin', is_active=1;" \
+    2>/dev/null && log "User admin '${ADMIN_USER}' creat cu succes" \
+    || warn "Creare admin esuata - ruleaza manual dupa instalare"
 
 # =============================================================
-# STEP 8: Configure Firewall
+# STEP 9: Firewall
 # =============================================================
-step "Configuring firewall"
+step "Configurare firewall"
 
 if command -v ufw &>/dev/null; then
-    ufw --force enable
-    ufw allow ssh
-    ufw allow 80/tcp
-    ufw allow 443/tcp
-    log "UFW firewall configured"
+    ufw --force enable 2>/dev/null || true
+    ufw allow OpenSSH 2>/dev/null || true
+    ufw allow 80/tcp 2>/dev/null || true
+    ufw allow 443/tcp 2>/dev/null || true
+    log "UFW firewall configurat (SSH + 80 + 443)"
 fi
 
 # =============================================================
@@ -251,37 +221,41 @@ fi
 # =============================================================
 echo ""
 echo -e "${BOLD}${GREEN}╔══════════════════════════════════════════════════╗${NC}"
-echo -e "${BOLD}${GREEN}║         Installation Complete! 🎉                ║${NC}"
+echo -e "${BOLD}${GREEN}║         Instalare completa cu succes!            ║${NC}"
 echo -e "${BOLD}${GREEN}╚══════════════════════════════════════════════════╝${NC}"
 echo ""
-echo -e "  ${BOLD}Panel URL:${NC}       http://${PANEL_DOMAIN}/admin"
-echo -e "  ${BOLD}Player URL:${NC}      http://${PANEL_DOMAIN}/player"
-echo -e "  ${BOLD}Admin Username:${NC}  ${ADMIN_USER}"
-echo -e "  ${BOLD}Admin Password:${NC}  (as entered)"
-echo ""
+echo -e "  ${BOLD}Panel Admin:${NC}     http://${PANEL_DOMAIN}/admin"
+echo -e "  ${BOLD}Player Web:${NC}      http://${PANEL_DOMAIN}/player"
+echo -e "  ${BOLD}Portal Clienti:${NC}  http://${PANEL_DOMAIN}/portal"
 echo -e "  ${BOLD}Xtream API:${NC}      http://${PANEL_DOMAIN}/player_api.php"
-echo -e "  ${BOLD}M3U Playlist:${NC}    http://${PANEL_DOMAIN}/get.php?username=USER&password=PASS&type=m3u_plus"
-echo -e "  ${BOLD}XMLTV EPG:${NC}       http://${PANEL_DOMAIN}/xmltv.php?username=USER&password=PASS"
+echo -e "  ${BOLD}M3U Playlist:${NC}    http://${PANEL_DOMAIN}/get.php?username=X&password=Y&type=m3u_plus"
+echo -e "  ${BOLD}XMLTV EPG:${NC}       http://${PANEL_DOMAIN}/xmltv.php?username=X&password=Y"
 echo ""
-echo -e "  ${BOLD}Config file:${NC}     ${INSTALL_DIR}/docker/.env"
-echo -e "  ${BOLD}Logs:${NC}            docker compose -f ${INSTALL_DIR}/docker/docker-compose.yml logs -f"
+echo -e "  ${BOLD}Username admin:${NC}  ${ADMIN_USER}"
+echo -e "  ${BOLD}Parola admin:${NC}    (cea introdusa)"
 echo ""
-echo -e "  ${YELLOW}DB Password:${NC}     ${DB_PASSWORD}"
-echo -e "  ${YELLOW}Redis Password:${NC}  ${REDIS_PASSWORD}"
-echo -e "  ${YELLOW}Save these credentials securely!${NC}"
+echo -e "  ${YELLOW}Credentiale salvate in: /root/iptv-credentials.txt${NC}"
 echo ""
 
-# Save credentials to file
+# Salveaza credentiale
 cat > /root/iptv-credentials.txt << CREDS
-IPTV Panel Credentials - $(date)
-================================
-Panel URL: http://${PANEL_DOMAIN}/admin
-Admin User: ${ADMIN_USER}
+IPTV Panel - Credentiale instalare $(date)
+==========================================
+Panel Admin:    http://${PANEL_DOMAIN}/admin
+Player Web:     http://${PANEL_DOMAIN}/player
+Portal Client:  http://${PANEL_DOMAIN}/portal
 
-Database Password: ${DB_PASSWORD}
+Admin User:     ${ADMIN_USER}
+DB Password:    ${DB_PASSWORD}
 Redis Password: ${REDIS_PASSWORD}
-JWT Secret: ${JWT_SECRET}
-MySQL Root: ${MYSQL_ROOT_PASSWORD}
+JWT Secret:     ${JWT_SECRET}
+MySQL Root:     ${MYSQL_ROOT_PASSWORD}
+
+Comenzi utile:
+  cd /opt/iptv-panel/docker
+  docker compose logs -f          # vezi loguri
+  docker compose ps               # status containere
+  docker compose restart          # restart toate
 CREDS
 chmod 600 /root/iptv-credentials.txt
-log "Credentials saved to /root/iptv-credentials.txt"
+log "Credentiale salvate in /root/iptv-credentials.txt"
