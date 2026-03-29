@@ -193,31 +193,44 @@ log "Images built"
 step "Starting services"
 docker compose --env-file .env up -d
 
-log "Waiting for MySQL to initialize (60 seconds)..."
-sleep 60
+log "Waiting for MySQL to initialize (90 seconds)..."
+sleep 90
+
+# Wait until MySQL actually accepts connections
+MAX_WAIT=120
+WAITED=0
+until docker compose --env-file .env exec -T mysql mysqladmin ping -h localhost -u root -p"${MYSQL_ROOT_PASSWORD}" --silent 2>/dev/null; do
+    sleep 5
+    WAITED=$((WAITED + 5))
+    if [ "$WAITED" -ge "$MAX_WAIT" ]; then
+        warn "MySQL timeout - trying anyway..."
+        break
+    fi
+done
 
 # =============================================================
 # STEP 7: Create Admin User
 # =============================================================
 step "Creating admin user"
 
-# Hash password using Python
-ADMIN_HASH=$(docker compose exec -T mysql mysql -u root -p"${MYSQL_ROOT_PASSWORD}" iptv_panel -e \
-    "SELECT password FROM users WHERE username='admin';" 2>/dev/null | tail -1 || echo "")
+# Generate bcrypt hash via python container
+HASH=$(docker compose --env-file .env exec -T python-epg python3 -c \
+    "import bcrypt; print(bcrypt.hashpw(b'${ADMIN_PASS}', bcrypt.gensalt(12)).decode())" 2>/dev/null)
 
-if [ -z "$ADMIN_HASH" ]; then
-    # Generate bcrypt hash
-    HASH=$(docker compose exec -T python-epg python3 -c \
-        "import bcrypt; print(bcrypt.hashpw('${ADMIN_PASS}'.encode(), bcrypt.gensalt(12)).decode())")
+if [ -z "$HASH" ]; then
+    warn "Could not generate hash, using default password 'Admin@1234'"
+    HASH='$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TiGY1JwKhRrGJl8X4NwN5C5GBKKG'
+fi
 
-    docker compose exec -T mysql mysql -u root -p"${MYSQL_ROOT_PASSWORD}" iptv_panel << SQL
-INSERT INTO users (username, password, role, is_active, exp_date, max_connections)
-VALUES ('${ADMIN_USER}', '${HASH}', 'admin', 1, NULL, 10)
-ON DUPLICATE KEY UPDATE password = '${HASH}';
-SQL
+docker compose --env-file .env exec -T mysql mysql \
+    -u root -p"${MYSQL_ROOT_PASSWORD}" iptv_panel \
+    -e "INSERT INTO users (username, password, role, is_active, exp_date, max_connections) VALUES ('${ADMIN_USER}', '${HASH}', 'admin', 1, NULL, 10) ON DUPLICATE KEY UPDATE password='${HASH}';" 2>&1
+
+if [ $? -eq 0 ]; then
     log "Admin user '${ADMIN_USER}' created"
 else
-    warn "Admin user already exists"
+    warn "Admin user creation failed - run manually after install:"
+    warn "  cd /opt/iptv-panel/docker && docker compose exec mysql mysql -u root -p"
 fi
 
 # =============================================================
