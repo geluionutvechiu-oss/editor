@@ -204,41 +204,47 @@ fi
 # =============================================================
 step "Creare user admin"
 
-# Asteapta node-api sa fie disponibil (are bcryptjs)
+# Asteapta node-api sa fie gata (pana la 2 minute)
 info "Asteptare node-api..."
 for i in $(seq 1 24); do
-    if docker compose --env-file .env exec -T node-api node -e "require('bcryptjs')" 2>/dev/null; then
-        break
-    fi
+    READY=$(docker compose --env-file .env exec -T node-api \
+        node -e "require('bcryptjs'); process.stdout.write('ok')" 2>/dev/null | tr -d '\r\n')
+    [ "$READY" = "ok" ] && break
     sleep 5
+    echo -n "."
 done
+echo ""
 
-# Genereaza hash bcrypt folosind node-api (garantat are bcryptjs)
+# Genereaza hash bcrypt
 HASH=$(docker compose --env-file .env exec -T node-api \
     node -e "const b=require('bcryptjs');b.hash(process.argv[1],12).then(h=>process.stdout.write(h));" \
     "${ADMIN_PASS}" 2>/dev/null | tr -d '\r\n')
 
-# Fallback: genereaza cu openssl + hardcodat daca node-api nu e gata
-if [ -z "$HASH" ] || [ ${#HASH} -lt 55 ]; then
-    warn "Fallback hash bcrypt (schimba parola dupa login din Settings)"
-    # Hash valid pentru parola temporara 'TempPass123' - va fi suprascris mai jos
-    HASH='$2b$12$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi'
-    # Nota: parola temporara e 'password' - SCHIMBA IMEDIAT
+if [ -z "$HASH" ] || [ "${#HASH}" -lt 55 ]; then
+    err "Nu s-a putut genera hash pentru parola. Verifica ca node-api porneste corect."
 fi
 
-# Scrie parola folosita in credentials file pentru referinta
-ACTUAL_PASS="${ADMIN_PASS}"
-[ ${#HASH} -lt 55 ] && ACTUAL_PASS="password (SCHIMBA IMEDIAT!)"
+log "Hash parola generat (${#HASH} chars)"
 
-# Inserare user admin in DB
+# Inserare user admin
 docker compose --env-file .env exec -T mysql \
     mysql -u iptv_user -p"${DB_PASSWORD}" iptv_panel -e \
     "INSERT INTO users (username, password, role, is_active, max_connections, max_mobile_connections, max_stb_connections)
-     VALUES ('${ADMIN_USER}', '${HASH}', 'admin', 1, 999, 999, 999)
+     VALUES ('${ADMIN_USER}', '${HASH}', 'admin', 1, 200, 200, 200)
      ON DUPLICATE KEY UPDATE password='${HASH}', role='admin', is_active=1,
-     max_connections=999, max_mobile_connections=999, max_stb_connections=999;" \
-    2>/dev/null && log "User admin '${ADMIN_USER}' creat cu succes" \
-    || warn "Creare admin esuata - ruleaza manual dupa instalare"
+     max_connections=200, max_mobile_connections=200, max_stb_connections=200;" \
+    2>/dev/null \
+    && log "User admin '${ADMIN_USER}' creat cu succes" \
+    || warn "Creare admin esuata"
+
+# Verifica ca userul a fost creat
+COUNT=$(docker compose --env-file .env exec -T mysql \
+    mysql -u iptv_user -p"${DB_PASSWORD}" iptv_panel -sN \
+    -e "SELECT COUNT(*) FROM users WHERE username='${ADMIN_USER}';" 2>/dev/null | tr -d '\r\n')
+
+if [ "$COUNT" != "1" ]; then
+    warn "Userul admin nu a putut fi verificat in DB. Credentialele sunt salvate in /root/iptv-credentials.txt"
+fi
 
 # =============================================================
 # STEP 9: Firewall

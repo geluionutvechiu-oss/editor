@@ -128,9 +128,9 @@ router.post('/', authenticate, requireRole('admin', 'reseller'), [
   body('username').trim().isLength({ min: 3, max: 64 }).matches(/^[a-zA-Z0-9_.-]+$/),
   body('password').isLength({ min: 6, max: 128 }),
   body('email').optional({ nullable: true }).isEmail().normalizeEmail(),
-  body('max_connections').isInt({ min: 1, max: 100 }).default(1),
-  body('max_mobile_connections').optional().isInt({ min: 1, max: 100 }).default(1),
-  body('max_stb_connections').optional().isInt({ min: 1, max: 100 }).default(1),
+  body('max_connections').isInt({ min: 1, max: 1000 }).default(1),
+  body('max_mobile_connections').optional().isInt({ min: 1, max: 1000 }).default(1),
+  body('max_stb_connections').optional().isInt({ min: 1, max: 1000 }).default(1),
   body('exp_date').optional({ nullable: true }).isISO8601(),
   body('bouquet_id').optional({ nullable: true }).isInt({ min: 1 }),
   body('notes').optional().isLength({ max: 1000 })
@@ -201,7 +201,9 @@ router.post('/', authenticate, requireRole('admin', 'reseller'), [
 // PUT /api/users/:id
 router.put('/:id', authenticate, requireRole('admin', 'reseller'), [
   body('email').optional({ nullable: true }).isEmail().normalizeEmail(),
-  body('max_connections').optional().isInt({ min: 1, max: 100 }),
+  body('max_connections').optional().isInt({ min: 1, max: 1000 }),
+  body('max_mobile_connections').optional().isInt({ min: 1, max: 1000 }),
+  body('max_stb_connections').optional().isInt({ min: 1, max: 1000 }),
   body('exp_date').optional({ nullable: true }).isISO8601(),
   body('is_active').optional().isBoolean(),
   body('is_banned').optional().isBoolean(),
