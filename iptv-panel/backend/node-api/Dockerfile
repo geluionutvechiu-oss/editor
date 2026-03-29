@@ -5,7 +5,7 @@ RUN apk add --no-cache tini
 # Dependencies stage
 FROM base AS deps
 COPY package.json ./
-RUN npm install --omit=dev --frozen-lockfile && npm cache clean --force
+RUN npm install --omit=dev && npm cache clean --force
 
 # Production stage
 FROM base AS production
