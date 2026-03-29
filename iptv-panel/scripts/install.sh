@@ -98,15 +98,23 @@ fi
 # =============================================================
 step "Pregatire fisiere proiect"
 
-# Curata instalare veche daca exista
+# Curata instalare veche complet
 if [ -d "$INSTALL_DIR" ]; then
-    warn "Director existent gasit. Curatare..."
-    # Opreste containere daca ruleaza
+    warn "Instalare veche gasita. Curatare completa..."
     if [ -f "$INSTALL_DIR/docker/docker-compose.yml" ]; then
         cd "$INSTALL_DIR/docker" && docker compose down -v 2>/dev/null || true
+        cd /
     fi
     rm -rf "$INSTALL_DIR"
 fi
+
+# Curata containere si retele Docker ramase
+info "Curatare containere Docker vechi..."
+docker ps -aq --filter "name=iptv_" | xargs -r docker stop 2>/dev/null || true
+docker ps -aq --filter "name=iptv_" | xargs -r docker rm 2>/dev/null || true
+docker network ls --filter "name=docker_iptv" -q | xargs -r docker network rm 2>/dev/null || true
+docker network prune -f 2>/dev/null || true
+
 mkdir -p "$INSTALL_DIR"
 
 # Cloneaza din GitHub

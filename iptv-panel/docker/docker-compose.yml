@@ -209,6 +209,3 @@ volumes:
 networks:
   iptv_net:
     driver: bridge
-    ipam:
-      config:
-        - subnet: 172.20.0.0/16
