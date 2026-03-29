@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { body, validationResult } = require('express-validator');
 const { query, queryOne } = require('../config/database');
-const { cache } = require('../config/redis');
+const { cache, redis } = require('../config/redis');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { checkStreamHealth } = require('../services/streamHealth');
 const logger = require('../config/logger');
@@ -69,10 +69,12 @@ router.get('/dashboard', authenticate, requireRole('admin', 'reseller'), async (
 
   // Get active connections from Redis
   let totalActiveConns = 0;
-  const connKeys = await cache.redis ? (await require('../config/redis').redis.keys('connections:user:*')) : [];
-  for (const key of connKeys) {
-    totalActiveConns += await require('../config/redis').redis.hlen(key);
-  }
+  try {
+    const connKeys = await redis.keys('connections:user:*');
+    for (const key of connKeys) {
+      totalActiveConns += await redis.hlen(key);
+    }
+  } catch { /* Redis temporarily unavailable */ }
 
   res.json({
     success: true,

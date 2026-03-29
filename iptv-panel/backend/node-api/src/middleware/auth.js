@@ -39,11 +39,13 @@ async function authenticate(req, res, next) {
     return res.status(401).json({ success: false, message: 'Invalid or expired token' });
   }
 
-  // Check if token was revoked
-  const revoked = await cache.get(`revoked:${decoded.jti}`);
-  if (revoked) {
-    return res.status(401).json({ success: false, message: 'Token has been revoked' });
-  }
+  // Check if token was revoked (Redis might be temporarily unavailable)
+  try {
+    const revoked = await cache.get(`revoked:${decoded.jti}`);
+    if (revoked) {
+      return res.status(401).json({ success: false, message: 'Token has been revoked' });
+    }
+  } catch { /* Redis unavailable, skip revocation check */ }
 
   // Fetch fresh user data
   const user = await queryOne(

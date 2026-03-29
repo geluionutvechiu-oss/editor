@@ -51,7 +51,8 @@ router.get('/', authenticate, requireRole('admin', 'reseller'), async (req, res)
 
   const users = await query(
     `SELECT u.id, u.username, u.email, u.role, u.is_active, u.is_banned,
-            u.exp_date, u.max_connections, u.member_since, u.last_login,
+            u.exp_date, u.max_connections, u.max_mobile_connections, u.max_stb_connections,
+            u.member_since, u.last_login,
             u.last_login_ip, u.trial_mode, u.bouquet_id, u.reseller_id,
             b.name as bouquet_name
      FROM users u
@@ -82,7 +83,8 @@ router.get('/:id', authenticate, requireRole('admin', 'reseller'), async (req, r
 
   const user = await queryOne(
     `SELECT u.id, u.username, u.email, u.role, u.is_active, u.is_banned,
-            u.ban_reason, u.exp_date, u.max_connections, u.allowed_output_formats,
+            u.ban_reason, u.exp_date, u.max_connections, u.max_mobile_connections, u.max_stb_connections,
+            u.allowed_output_formats,
             u.ip_whitelist, u.member_since, u.last_login, u.last_login_ip,
             u.last_user_agent, u.trial_mode, u.bouquet_id, u.reseller_id, u.notes,
             u.timezone, u.created_at,
@@ -127,6 +129,8 @@ router.post('/', authenticate, requireRole('admin', 'reseller'), [
   body('password').isLength({ min: 6, max: 128 }),
   body('email').optional({ nullable: true }).isEmail().normalizeEmail(),
   body('max_connections').isInt({ min: 1, max: 100 }).default(1),
+  body('max_mobile_connections').optional().isInt({ min: 1, max: 100 }).default(1),
+  body('max_stb_connections').optional().isInt({ min: 1, max: 100 }).default(1),
   body('exp_date').optional({ nullable: true }).isISO8601(),
   body('bouquet_id').optional({ nullable: true }).isInt({ min: 1 }),
   body('notes').optional().isLength({ max: 1000 })
@@ -136,7 +140,7 @@ router.post('/', authenticate, requireRole('admin', 'reseller'), [
     return res.status(400).json({ success: false, errors: errors.array() });
   }
 
-  const { username, password, email, max_connections, exp_date, bouquet_id, notes } = req.body;
+  const { username, password, email, max_connections, max_mobile_connections, max_stb_connections, exp_date, bouquet_id, notes } = req.body;
 
   const existing = await queryOne('SELECT id FROM users WHERE username = ?', [username]);
   if (existing) {
@@ -157,11 +161,15 @@ router.post('/', authenticate, requireRole('admin', 'reseller'), [
   const result = await transaction(async (conn) => {
     const [insertResult] = await conn.execute(
       `INSERT INTO users (username, password, email, role, max_connections,
+        max_mobile_connections, max_stb_connections,
         exp_date, bouquet_id, reseller_id, notes, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         username, hashed, email || null, role,
-        max_connections || 1, exp_date || null,
+        max_connections || 1,
+        max_mobile_connections || 1,
+        max_stb_connections || 1,
+        exp_date || null,
         bouquet_id || null,
         req.user.role === 'reseller' ? req.user.id : null,
         notes || null, req.user.id
@@ -215,7 +223,8 @@ router.put('/:id', authenticate, requireRole('admin', 'reseller'), [
   }
 
   const updates = {};
-  const allowed = ['email', 'max_connections', 'exp_date', 'is_active', 'is_banned',
+  const allowed = ['email', 'max_connections', 'max_mobile_connections', 'max_stb_connections',
+                   'exp_date', 'is_active', 'is_banned',
                    'ban_reason', 'bouquet_id', 'notes', 'timezone'];
 
   for (const field of allowed) {

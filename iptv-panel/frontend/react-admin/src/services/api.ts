@@ -29,7 +29,7 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem('iptv_token');
       localStorage.removeItem('iptv_user');
-      window.location.href = '/login';
+      window.location.href = '/admin/login';
     }
     const message = (error.response?.data as any)?.message || error.message || 'Request failed';
     return Promise.reject(new Error(message));

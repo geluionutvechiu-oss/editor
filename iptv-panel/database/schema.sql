@@ -52,6 +52,8 @@ CREATE TABLE IF NOT EXISTS `users` (
   `role` ENUM('admin','reseller','user') NOT NULL DEFAULT 'user',
   `reseller_id` INT UNSIGNED DEFAULT NULL COMMENT 'parent reseller user_id',
   `max_connections` TINYINT UNSIGNED NOT NULL DEFAULT 1,
+  `max_mobile_connections` TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'max simultane telefoane mobile/tablet',
+  `max_stb_connections` TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'max simultane Smart TV / STB',
   `allowed_output_formats` SET('m3u8','ts','rtmp') NOT NULL DEFAULT 'm3u8,ts',
   `is_active` TINYINT(1) NOT NULL DEFAULT 1,
   `is_banned` TINYINT(1) NOT NULL DEFAULT 0,

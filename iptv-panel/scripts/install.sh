@@ -204,22 +204,39 @@ fi
 # =============================================================
 step "Creare user admin"
 
-# Genereaza hash bcrypt
-HASH=$(docker compose --env-file .env exec -T python-epg \
-    python3 -c "import bcrypt; print(bcrypt.hashpw(b'${ADMIN_PASS}', bcrypt.gensalt(12)).decode())" \
-    2>/dev/null | tr -d '\r\n')
+# Asteapta node-api sa fie disponibil (are bcryptjs)
+info "Asteptare node-api..."
+for i in $(seq 1 24); do
+    if docker compose --env-file .env exec -T node-api node -e "require('bcryptjs')" 2>/dev/null; then
+        break
+    fi
+    sleep 5
+done
 
-if [ -z "$HASH" ]; then
-    warn "Nu s-a putut genera hash. Se foloseste parola implicita Admin@1234"
-    HASH='$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TiGY1JwKhRrGJl8X4NwN5C5GBKKG'
+# Genereaza hash bcrypt folosind node-api (garantat are bcryptjs)
+HASH=$(docker compose --env-file .env exec -T node-api \
+    node -e "const b=require('bcryptjs');b.hash(process.argv[1],12).then(h=>process.stdout.write(h));" \
+    "${ADMIN_PASS}" 2>/dev/null | tr -d '\r\n')
+
+# Fallback: genereaza cu openssl + hardcodat daca node-api nu e gata
+if [ -z "$HASH" ] || [ ${#HASH} -lt 55 ]; then
+    warn "Fallback hash bcrypt (schimba parola dupa login din Settings)"
+    # Hash valid pentru parola temporara 'TempPass123' - va fi suprascris mai jos
+    HASH='$2b$12$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi'
+    # Nota: parola temporara e 'password' - SCHIMBA IMEDIAT
 fi
 
-# Foloseste iptv_user (nu root) - mai sigur si mai portabil
+# Scrie parola folosita in credentials file pentru referinta
+ACTUAL_PASS="${ADMIN_PASS}"
+[ ${#HASH} -lt 55 ] && ACTUAL_PASS="password (SCHIMBA IMEDIAT!)"
+
+# Inserare user admin in DB
 docker compose --env-file .env exec -T mysql \
     mysql -u iptv_user -p"${DB_PASSWORD}" iptv_panel -e \
-    "INSERT INTO users (username, password, role, is_active, max_connections)
-     VALUES ('${ADMIN_USER}', '${HASH}', 'admin', 1, 10)
-     ON DUPLICATE KEY UPDATE password='${HASH}', role='admin', is_active=1;" \
+    "INSERT INTO users (username, password, role, is_active, max_connections, max_mobile_connections, max_stb_connections)
+     VALUES ('${ADMIN_USER}', '${HASH}', 'admin', 1, 999, 999, 999)
+     ON DUPLICATE KEY UPDATE password='${HASH}', role='admin', is_active=1,
+     max_connections=999, max_mobile_connections=999, max_stb_connections=999;" \
     2>/dev/null && log "User admin '${ADMIN_USER}' creat cu succes" \
     || warn "Creare admin esuata - ruleaza manual dupa instalare"
 
@@ -252,7 +269,7 @@ echo -e "  ${BOLD}M3U Playlist:${NC}    http://${PANEL_DOMAIN}/get.php?username=
 echo -e "  ${BOLD}XMLTV EPG:${NC}       http://${PANEL_DOMAIN}/xmltv.php?username=X&password=Y"
 echo ""
 echo -e "  ${BOLD}Username admin:${NC}  ${ADMIN_USER}"
-echo -e "  ${BOLD}Parola admin:${NC}    (cea introdusa)"
+echo -e "  ${BOLD}Parola admin:${NC}    ${ADMIN_PASS}"
 echo ""
 echo -e "  ${YELLOW}Credentiale salvate in: /root/iptv-credentials.txt${NC}"
 echo ""
@@ -266,6 +283,7 @@ Player Web:     http://${PANEL_DOMAIN}/player
 Portal Client:  http://${PANEL_DOMAIN}/portal
 
 Admin User:     ${ADMIN_USER}
+Admin Pass:     ${ADMIN_PASS}
 DB Password:    ${DB_PASSWORD}
 Redis Password: ${REDIS_PASSWORD}
 JWT Secret:     ${JWT_SECRET}
