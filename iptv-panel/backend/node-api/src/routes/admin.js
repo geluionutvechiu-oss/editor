@@ -282,28 +282,27 @@ router.get('/revenue', authenticate, requireRole('admin'), async (req, res) => {
     default: groupFormat = '%Y-%m'; interval = '12 MONTH';
   }
 
-  const revenue = await query(`
-    SELECT
-      DATE_FORMAT(created_at, '${groupFormat}') as period,
-      COUNT(*) as transactions,
-      SUM(CASE WHEN type = 'credit' THEN amount ELSE 0 END) as credits_added,
-      SUM(CASE WHEN type = 'debit' THEN ABS(amount) ELSE 0 END) as credits_used
-    FROM credit_transactions
-    WHERE created_at >= DATE_SUB(NOW(), INTERVAL ${interval})
-    GROUP BY period
-    ORDER BY period ASC
-  `);
+  // groupFormat and interval come only from the switch above — safe to interpolate
+  const revenue = await query(
+    `SELECT DATE_FORMAT(created_at, ?) as period,
+            COUNT(*) as transactions,
+            SUM(CASE WHEN type = 'credit' THEN amount ELSE 0 END) as credits_added,
+            SUM(CASE WHEN type = 'debit' THEN ABS(amount) ELSE 0 END) as credits_used
+     FROM credit_transactions
+     WHERE created_at >= DATE_SUB(NOW(), INTERVAL ${interval})
+     GROUP BY period ORDER BY period ASC`,
+    [groupFormat]
+  );
 
-  const subscriptions = await query(`
-    SELECT
-      DATE_FORMAT(created_at, '${groupFormat}') as period,
-      COUNT(*) as count,
-      SUM(price) as total_revenue
-    FROM subscriptions
-    WHERE created_at >= DATE_SUB(NOW(), INTERVAL ${interval})
-    GROUP BY period
-    ORDER BY period ASC
-  `);
+  const subscriptions = await query(
+    `SELECT DATE_FORMAT(created_at, ?) as period,
+            COUNT(*) as count,
+            SUM(price) as total_revenue
+     FROM subscriptions
+     WHERE created_at >= DATE_SUB(NOW(), INTERVAL ${interval})
+     GROUP BY period ORDER BY period ASC`,
+    [groupFormat]
+  );
 
   res.json({ success: true, data: { revenue, subscriptions } });
 });

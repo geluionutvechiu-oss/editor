@@ -46,6 +46,10 @@ async function antiScan(req, res, next) {
   const ua = req.headers['user-agent'] || '';
   const ip = (req.ip || '').replace('::ffff:', '');
 
+  // Nu bloca IP-uri interne (Docker, localhost, rețele private)
+  const isInternal = /^(127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|::1$)/.test(ip);
+  if (isInternal) return next();
+
   // Blochează scanner-e cunoscute
   if (SCANNER_SIGNATURES.some(sig => sig.test(ua))) {
     const scanKey = `scan:${ip}`;
