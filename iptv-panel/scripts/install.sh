@@ -66,6 +66,18 @@ apt-get install -y -qq curl wget git openssl ca-certificates \
 
 log "Dependinte instalate"
 
+# Opreste servicii care ocupa porturile 80, 443, 3306, 6379
+info "Eliberare porturi (80, 443)..."
+for svc in nginx apache2 apache httpd mysql mariadb redis redis-server; do
+    systemctl stop $svc 2>/dev/null || true
+    systemctl disable $svc 2>/dev/null || true
+done
+# Ucide orice proces pe porturile critice
+fuser -k 80/tcp 2>/dev/null || true
+fuser -k 443/tcp 2>/dev/null || true
+sleep 2
+log "Porturi eliberate"
+
 # =============================================================
 # STEP 3: Docker
 # =============================================================
