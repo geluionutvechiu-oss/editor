@@ -529,25 +529,48 @@ SET FOREIGN_KEY_CHECKS = 1;
 -- ============================================================
 
 INSERT INTO `settings` (`key`, `value`, `description`, `type`) VALUES
+-- General
 ('panel_name', 'IPTV Panel', 'Panel display name', 'string'),
 ('panel_url', 'http://localhost', 'Panel base URL', 'string'),
-('tmdb_api_key', '', 'TMDB API key for metadata', 'string'),
-('epg_auto_update', '1', 'Auto-update EPG every 12h', 'boolean'),
-('epg_update_hours', '12', 'EPG update interval in hours', 'integer'),
-('max_login_attempts', '5', 'Max failed logins before block', 'integer'),
-('session_timeout', '86400', 'JWT token TTL in seconds', 'integer'),
-('connection_cleanup_mins', '5', 'Remove stale connections after N minutes', 'integer'),
-('registration_enabled', '0', 'Allow public registration', 'boolean'),
+('server_timezone', 'UTC', 'Server timezone', 'string'),
+('maintenance_mode', '0', 'Put panel in maintenance mode', 'boolean'),
+-- Reseller & Permissions
+('reseller_credit_cost', '1.00', 'Cost per reseller credit in USD', 'string'),
+('reseller_default_credits', '10', 'Default credits for new resellers', 'integer'),
+('reseller_default_max_clients', '50', 'Default max clients for new resellers', 'integer'),
+('reseller_can_create_reseller', '0', 'Allow resellers to create sub-resellers', 'boolean'),
+('reseller_can_delete_users', '1', 'Allow resellers to delete their clients', 'boolean'),
+('reseller_can_set_bouquet', '1', 'Allow resellers to set bouquet for clients', 'boolean'),
+('reseller_can_set_expiry', '1', 'Allow resellers to set expiry for clients', 'boolean'),
 ('trial_days', '1', 'Free trial duration in days', 'integer'),
+-- Security
+('max_login_attempts', '5', 'Max failed logins before IP block', 'integer'),
+('session_timeout', '86400', 'JWT token TTL in seconds', 'integer'),
+('registration_enabled', '0', 'Allow public registration', 'boolean'),
+('block_vpn', '0', 'Block VPN/proxy connections', 'boolean'),
+('force_https', '0', 'Redirect HTTP to HTTPS', 'boolean'),
+-- Streaming
+('bandwidth_limit_mbps', '0', '0 = unlimited per user', 'integer'),
+('connection_cleanup_mins', '5', 'Remove stale connections after N minutes', 'integer'),
+('max_connections_global', '0', 'Global max concurrent connections (0=unlimited)', 'integer'),
+('allow_m3u_download', '1', 'Allow users to download M3U playlist', 'boolean'),
+('stream_retry_attempts', '3', 'Stream retry attempts on failure', 'integer'),
+-- EPG
+('epg_auto_update', '1', 'Auto-update EPG every N hours', 'boolean'),
+('epg_update_hours', '12', 'EPG update interval in hours', 'integer'),
+-- Billing
+('currency', 'USD', 'Billing currency code', 'string'),
+('price_per_connection', '5.00', 'Default price per IPTV line', 'string'),
+('invoice_prefix', 'INV-', 'Invoice number prefix', 'string'),
+-- SMTP / Email
 ('smtp_host', '', 'SMTP server hostname', 'string'),
 ('smtp_port', '587', 'SMTP server port', 'integer'),
-('smtp_user', '', 'SMTP username', 'string'),
+('smtp_user', '', 'SMTP username / email address', 'string'),
 ('smtp_pass', '', 'SMTP password', 'string'),
 ('smtp_from', '', 'From email address', 'string'),
-('bandwidth_limit_mbps', '0', '0 = unlimited per user', 'integer'),
-('server_timezone', 'UTC', 'Server timezone', 'string'),
-('maintenance_mode', '0', 'Put panel in maintenance mode', 'boolean')
-ON DUPLICATE KEY UPDATE `value` = VALUES(`value`);
+-- API Keys
+('tmdb_api_key', '', 'TMDB API key for movie/series metadata', 'string')
+ON DUPLICATE KEY UPDATE `description` = VALUES(`description`), `type` = VALUES(`type`);
 
 INSERT INTO `stream_categories` (`category_name`, `category_type`) VALUES
 ('General', 'live'),
