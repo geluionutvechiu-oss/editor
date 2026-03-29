@@ -53,7 +53,7 @@ const PageLoader = () => (
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      <BrowserRouter basename="/admin">
         <Toaster
           position="top-right"
           toastOptions={{
