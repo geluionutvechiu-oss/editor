@@ -40,4 +40,9 @@ class Stream extends Model
     {
         return $this->belongsToMany(Bouquet::class, 'bouquet_streams');
     }
+
+    public function liveConnections(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(LiveConnection::class);
+    }
 }
