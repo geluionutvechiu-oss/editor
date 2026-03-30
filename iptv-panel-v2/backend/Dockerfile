@@ -1,6 +1,5 @@
 FROM php:8.3-fpm-alpine
 
-# Use pre-built extension installer for speed
 ADD https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions /usr/local/bin/
 RUN chmod +x /usr/local/bin/install-php-extensions \
     && install-php-extensions pdo_pgsql mbstring exif pcntl bcmath gd redis \
@@ -9,14 +8,14 @@ RUN chmod +x /usr/local/bin/install-php-extensions \
 
 WORKDIR /var/www/html
 
+# Install deps first (--no-scripts so artisan is not required yet)
 COPY composer.json composer.lock* ./
-RUN composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev 2>/dev/null || \
-    composer install --no-interaction --prefer-dist
+RUN composer install --no-interaction --prefer-dist --no-scripts
 
+# Copy full source, then finalize autoload
 COPY . .
-
-RUN chmod -R 775 storage bootstrap/cache \
-    && php artisan config:clear 2>/dev/null || true
+RUN composer dump-autoload --optimize \
+    && chmod -R 775 storage bootstrap/cache
 
 EXPOSE 8000
 
