@@ -1,22 +1,5 @@
 'use client'
 
-import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
-import { authApi } from '@/lib/api'
-import type { User } from '@/types'
-
-interface AuthState {
-  user: User | null
-  token: string | null
-  isLoading: boolean
-  isAuthenticated: boolean
-  login: (email: string, password: string) => Promise<void>
-  logout: () => Promise<void>
-  fetchMe: () => Promise<void>
-  setUser: (user: User) => void
-}
-
-// Simple hook without zustand for SSR compatibility
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 
