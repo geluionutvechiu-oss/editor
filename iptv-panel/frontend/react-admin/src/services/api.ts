@@ -66,7 +66,8 @@ export const streamsApi = {
   checkHealth: (id: number) => api.get(`/streams/${id}/health`),
   bulkImport: (formData: FormData) =>
     api.post('/streams/bulk-import', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 300000, // 5 min — large M3U files can have thousands of entries
     }),
   categories: () => api.get('/streams/categories/list'),
 };

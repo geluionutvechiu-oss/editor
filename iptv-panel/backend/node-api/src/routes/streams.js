@@ -201,11 +201,11 @@ router.post('/bulk-import', authenticate, requireRole('admin'), upload.single('f
   } else if (req.body.url) {
     try {
       const response = await axios.get(req.body.url, {
-        timeout: 30000,
-        maxContentLength: 50 * 1024 * 1024,
+        timeout: 120000, // 2 min for URL fetch
+        maxContentLength: 100 * 1024 * 1024,
         headers: { 'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18' }
       });
-      m3uContent = response.data;
+      m3uContent = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
     } catch (err) {
       return res.status(400).json({ success: false, message: `Failed to fetch M3U: ${err.message}` });
     }
@@ -221,49 +221,74 @@ router.post('/bulk-import', authenticate, requireRole('admin'), upload.single('f
   const defaultCategoryId = req.body.category_id ? parseInt(req.body.category_id) : null;
   let imported = 0, skipped = 0, errors = 0;
 
-  await transaction(async (conn) => {
-    for (const item of parsed) {
-      try {
-        // Resolve or create category
-        let categoryId = defaultCategoryId;
-        if (item.group && !defaultCategoryId) {
-          let cat = await queryOne(
-            'SELECT id FROM stream_categories WHERE category_name = ? AND category_type = ?',
-            [item.group.substring(0, 150), item.stream_type || 'live']
-          );
-          if (!cat) {
-            const [r] = await conn.execute(
-              'INSERT INTO stream_categories (category_name, category_type) VALUES (?, ?)',
-              [item.group.substring(0, 150), item.stream_type || 'live']
-            );
-            categoryId = r.insertId;
-          } else {
-            categoryId = cat.id;
-          }
-        }
+  // Pre-build category map to avoid N queries per stream
+  const categoryMap = new Map(); // "name:type" -> id
 
-        await conn.execute(
-          `INSERT IGNORE INTO streams (name, stream_display_name, stream_icon, epg_channel_id,
-            direct_source, category_id, stream_type, tv_archive)
-           VALUES (?, ?, ?, ?, ?, ?, ?, 0)`,
-          [
-            item.name.substring(0, 255), item.name.substring(0, 255),
-            item.logo ? item.logo.substring(0, 999) : null,
-            item.tvg_id ? item.tvg_id.substring(0, 255) : null,
-            item.url.substring(0, 1999), categoryId,
-            item.stream_type || 'live'
-          ]
-        );
-        imported++;
-      } catch (e) {
-        logger.error('Import error', { item: item.name, err: e.message });
-        errors++;
-      }
+  // Collect all unique groups from the M3U
+  const uniqueGroups = [...new Set(
+    parsed
+      .filter(item => item.group && !defaultCategoryId)
+      .map(item => `${item.group.substring(0, 150)}:${item.stream_type || 'live'}`)
+  )];
+
+  // Fetch or create all categories upfront
+  for (const groupKey of uniqueGroups) {
+    const [groupName, streamType] = groupKey.split(':');
+    let cat = await queryOne(
+      'SELECT id FROM stream_categories WHERE category_name = ? AND category_type = ?',
+      [groupName, streamType]
+    );
+    if (!cat) {
+      const result = await query(
+        'INSERT INTO stream_categories (category_name, category_type) VALUES (?, ?)',
+        [groupName, streamType]
+      );
+      categoryMap.set(groupKey, result.insertId);
+    } else {
+      categoryMap.set(groupKey, cat.id);
     }
-  });
+  }
+
+  // Bulk insert in batches of 500 rows
+  const BATCH_SIZE = 500;
+  for (let i = 0; i < parsed.length; i += BATCH_SIZE) {
+    const batch = parsed.slice(i, i + BATCH_SIZE);
+    const placeholders = batch.map(() => '(?, ?, ?, ?, ?, ?, ?, 0)').join(', ');
+    const values = [];
+
+    for (const item of batch) {
+      let categoryId = defaultCategoryId;
+      if (item.group && !defaultCategoryId) {
+        categoryId = categoryMap.get(`${item.group.substring(0, 150)}:${item.stream_type || 'live'}`) || null;
+      }
+      values.push(
+        item.name.substring(0, 255),
+        item.name.substring(0, 255),
+        item.logo ? item.logo.substring(0, 999) : null,
+        item.tvg_id ? item.tvg_id.substring(0, 255) : null,
+        item.url.substring(0, 1999),
+        categoryId,
+        item.stream_type || 'live'
+      );
+    }
+
+    try {
+      const result = await query(
+        `INSERT IGNORE INTO streams (name, stream_display_name, stream_icon, epg_channel_id,
+          direct_source, category_id, stream_type, tv_archive)
+         VALUES ${placeholders}`,
+        values
+      );
+      imported += result.affectedRows || batch.length;
+      skipped += batch.length - (result.affectedRows || batch.length);
+    } catch (e) {
+      logger.error('Bulk insert batch error', { batch: i, err: e.message });
+      errors += batch.length;
+    }
+  }
 
   await cache.delPattern('streams:list:*');
-  logger.info('Bulk import', { by: req.user.id, total: parsed.length, imported, errors });
+  logger.info('Bulk import', { by: req.user.id, total: parsed.length, imported, skipped, errors });
 
   res.json({
     success: true,
