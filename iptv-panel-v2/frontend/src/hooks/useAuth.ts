@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { authApi } from '@/lib/api'
+import type { User } from '@/types'
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null)
