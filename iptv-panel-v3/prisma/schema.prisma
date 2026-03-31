@@ -1,0 +1,262 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  RESELLER
+  CLIENT
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  EXPIRED
+}
+
+enum ServerType {
+  XTREAM
+  STALKER
+  M3U
+}
+
+enum ServerStatus {
+  ONLINE
+  OFFLINE
+  DEGRADED
+}
+
+enum InvoiceStatus {
+  PAID
+  PENDING
+  OVERDUE
+}
+
+enum FirewallRuleType {
+  WHITELIST
+  BLACKLIST
+}
+
+enum NotificationType {
+  INFO
+  WARNING
+  ERROR
+  SUCCESS
+}
+
+model User {
+  id                String     @id @default(uuid())
+  email             String     @unique
+  username          String     @unique
+  password          String
+  role              Role       @default(RESELLER)
+  status            UserStatus @default(ACTIVE)
+  twoFactorEnabled  Boolean    @default(false)
+  twoFactorSecret   String?
+  credits           Float      @default(0)
+  resellerId        String?
+  reseller          User?      @relation("ResellerClients", fields: [resellerId], references: [id])
+  clients           User[]     @relation("ResellerClients")
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  iptvClients       Client[]
+  sessions          Session[]
+  auditLogs         AuditLog[]
+  notifications     Notification[]
+  invoices          Invoice[]
+  apiKeys           ApiKey[]
+
+  @@index([email])
+  @@index([resellerId])
+}
+
+model Client {
+  id              String     @id @default(uuid())
+  username        String     @unique
+  password        String
+  m3uUrl          String?
+  xtreamHost      String?
+  status          UserStatus @default(ACTIVE)
+  maxConnections  Int        @default(1)
+  expiresAt       DateTime
+  lastSeen        DateTime?
+  deviceCount     Int        @default(0)
+  notes           String?
+  bouquets        String[]
+
+  ownerId         String
+  owner           User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  serverId        String?
+  server          Server?    @relation(fields: [serverId], references: [id])
+
+  planId          String?
+  plan            Plan?      @relation(fields: [planId], references: [id])
+
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  invoices        Invoice[]
+  sharingAlerts   SharingAlert[]
+
+  @@index([ownerId])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+model Plan {
+  id             String   @id @default(uuid())
+  name           String
+  description    String?
+  durationDays   Int
+  maxConnections Int      @default(1)
+  price          Float
+  bouquets       String[]
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  clients        Client[]
+}
+
+model Server {
+  id            String       @id @default(uuid())
+  name          String
+  url           String
+  type          ServerType   @default(XTREAM)
+  username      String?
+  password      String?
+  status        ServerStatus @default(ONLINE)
+  uptime        Float        @default(100)
+  activeStreams  Int          @default(0)
+  maxStreams     Int          @default(1000)
+  bandwidthMbps Float        @default(0)
+  location      String?
+  lastChecked   DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  clients       Client[]
+}
+
+model Invoice {
+  id            String        @id @default(uuid())
+  invoiceNumber String        @unique
+  amount        Float
+  status        InvoiceStatus @default(PENDING)
+  dueDate       DateTime
+  paidAt        DateTime?
+  notes         String?
+
+  clientId      String
+  client        Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  userId        String
+  user          User          @relation(fields: [userId], references: [id])
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([clientId])
+  @@index([userId])
+  @@index([status])
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token        String   @unique
+  refreshToken String?  @unique
+  ip           String
+  userAgent    String?
+  device       String?
+  lastActive   DateTime @default(now())
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([token])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  resource  String?
+  details   Json?
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      NotificationType @default(INFO)
+  read      Boolean          @default(false)
+  link      String?
+  createdAt DateTime         @default(now())
+
+  @@index([userId])
+  @@index([read])
+}
+
+model FirewallRule {
+  id        String           @id @default(uuid())
+  type      FirewallRuleType
+  value     String
+  reason    String?
+  createdBy String?
+  expiresAt DateTime?
+  createdAt DateTime         @default(now())
+
+  @@unique([type, value])
+}
+
+model ApiKey {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  key         String    @unique
+  lastUsed    DateTime?
+  permissions String[]
+  isActive    Boolean   @default(true)
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([key])
+  @@index([userId])
+}
+
+model SharingAlert {
+  id        String   @id @default(uuid())
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  ips       String[]
+  resolved  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([clientId])
+}
+
+model Setting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     Json
+  updatedAt DateTime @updatedAt
+}
