@@ -30,7 +30,16 @@ fi
 
 # Detect public IP
 echo -e "${BLUE}[1/7]${NC} Detecting server IP..."
-SERVER_IP=$(curl -s --max-time 5 ifconfig.me || curl -s --max-time 5 icanhazip.com || hostname -I | awk '{print $1}')
+SERVER_IP=$(curl -s --max-time 5 -4 ifconfig.me 2>/dev/null \
+  || curl -s --max-time 5 -4 icanhazip.com 2>/dev/null \
+  || curl -s --max-time 5 -4 api.ipify.org 2>/dev/null \
+  || ip -4 addr show scope global | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -1 \
+  || hostname -I | tr ' ' '\n' | grep -v ':' | head -1)
+
+# If still IPv6, wrap in brackets for valid URL
+if echo "$SERVER_IP" | grep -q ':'; then
+  SERVER_IP="[$SERVER_IP]"
+fi
 echo -e "      Server IP: ${GREEN}${SERVER_IP}${NC}"
 
 # Install Docker
