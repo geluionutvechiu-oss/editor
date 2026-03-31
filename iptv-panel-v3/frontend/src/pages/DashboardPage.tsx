@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import api from '@/lib/api';
 import type { DashboardStats, ChartData, Server as IServer } from '@/types';
 import { format } from 'date-fns';
-import { socket } from '@/lib/socket';
+import { getSocket } from '@/lib/socket';
 
 export default function DashboardPage() {
   const [liveServers, setLiveServers] = useState<IServer[]>([]);
@@ -31,8 +31,8 @@ export default function DashboardPage() {
   });
 
   useEffect(() => {
-    socket.on('server_stats', (servers: IServer[]) => setLiveServers(servers));
-    return () => { socket.off('server_stats'); };
+    getSocket().on('server_stats', (servers: IServer[]) => setLiveServers(servers));
+    return () => { getSocket().off('server_stats'); };
   }, []);
 
   const servers = liveServers.length > 0 ? liveServers : (stats?.servers || []);

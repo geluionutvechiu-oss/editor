@@ -16,7 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/use-toast';
 import api from '@/lib/api';
 import type { Server } from '@/types';
-import { socket } from '@/lib/socket';
+import { getSocket } from '@/lib/socket';
 
 const schema = z.object({
   name: z.string().min(1), url: z.string().url(), type: z.enum(['XTREAM', 'STALKER', 'M3U']),
@@ -35,12 +35,12 @@ export default function ServersPage() {
   const { data: servers, isLoading } = useQuery<Server[]>({ queryKey: ['servers'], queryFn: () => api.get('/servers').then(r => r.data) });
 
   useEffect(() => {
-    socket.on('server_stats', (stats: Server[]) => {
+    getSocket().on('server_stats', (stats: Server[]) => {
       const map: Record<string, Partial<Server>> = {};
       stats.forEach(s => { map[s.id] = s; });
       setLiveServers(map);
     });
-    return () => { socket.off('server_stats'); };
+    return () => { getSocket().off('server_stats'); };
   }, []);
 
   const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<FormData>({ resolver: zodResolver(schema), defaultValues: { type: 'XTREAM', maxStreams: 1000 } });

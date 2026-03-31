@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/use-toast';
 import api from '@/lib/api';
 import type { Notification } from '@/types';
-import { socket } from '@/lib/socket';
+import { getSocket } from '@/lib/socket';
 
 const typeIcon = (t: string) => {
   const map: Record<string, React.ReactNode> = {
@@ -46,11 +46,11 @@ export default function NotificationsPage() {
 
   // Real-time notifications via socket
   useEffect(() => {
-    socket.on('notification', (notif: Notification) => {
+    getSocket().on('notification', (notif: Notification) => {
       qc.invalidateQueries({ queryKey: ['notifications'] });
       toast({ title: notif.title, description: notif.message });
     });
-    return () => { socket.off('notification'); };
+    return () => { getSocket().off('notification'); };
   }, [qc]);
 
   return (
