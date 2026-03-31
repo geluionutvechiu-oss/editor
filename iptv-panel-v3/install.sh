@@ -113,7 +113,7 @@ echo -e "      ${GREEN}.env written.${NC}"
 # Start containers
 echo -e "${BLUE}[7/7]${NC} Starting IPTV Panel (this may take 2-3 minutes)..."
 docker compose pull 2>&1 | grep -E "Pulling|pulled|up to date" || true
-docker compose up -d --build
+docker compose --profile production up -d --build
 
 # Wait for backend to be ready
 echo ""
