@@ -215,6 +215,67 @@ router.get('/:id/credentials', async (req: AuthRequest, res: Response): Promise<
   res.json(credentials);
 });
 
+// POST /api/clients/:id/stop-connection
+router.post('/:id/stop-connection', async (req: AuthRequest, res: Response): Promise<void> => {
+  const where: Record<string, unknown> = { id: req.params.id };
+  if (req.user!.role !== 'ADMIN') where.ownerId = req.user!.userId;
+  const client = await prisma.client.findFirst({ where });
+  if (!client) { res.status(404).json({ error: 'Not found' }); return; }
+
+  await prisma.liveConnection.deleteMany({ where: { clientId: req.params.id } });
+  res.json({ message: 'Connection stopped' });
+});
+
+// POST /api/clients/:id/reset-blocks
+router.post('/:id/reset-blocks', requireRole('ADMIN'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const client = await prisma.client.findUnique({ where: { id: req.params.id } });
+  if (!client) { res.status(404).json({ error: 'Not found' }); return; }
+
+  // Delete IpBlock records for this client's current IP if known
+  if (client.currentIp) {
+    await prisma.ipBlock.deleteMany({ where: { value: client.currentIp } });
+  }
+  await prisma.client.update({ where: { id: req.params.id }, data: { blocksCount: 0 } });
+  res.json({ message: 'Blocks reset' });
+});
+
+// GET /api/clients/:id/connection-history
+router.get('/:id/connection-history', async (req: AuthRequest, res: Response): Promise<void> => {
+  const where: Record<string, unknown> = { id: req.params.id };
+  if (req.user!.role !== 'ADMIN') where.ownerId = req.user!.userId;
+  const client = await prisma.client.findFirst({ where });
+  if (!client) { res.status(404).json({ error: 'Not found' }); return; }
+
+  const logs = await prisma.connectionLog.findMany({
+    where: { clientId: req.params.id },
+    orderBy: { connectedAt: 'desc' },
+    take: 100,
+  });
+  res.json(logs);
+});
+
+// GET /api/clients/:id/download
+router.get('/:id/download', async (req: AuthRequest, res: Response): Promise<void> => {
+  const where: Record<string, unknown> = { id: req.params.id };
+  if (req.user!.role !== 'ADMIN') where.ownerId = req.user!.userId;
+  const client = await prisma.client.findFirst({ where, include: { server: true } });
+  if (!client) { res.status(404).json({ error: 'Not found' }); return; }
+
+  const xtreamHost = client.xtreamHost || client.server?.url || process.env.DEFAULT_SERVER_URL || 'http://your-server.com';
+  const credentials = {
+    username: client.username,
+    password: client.password,
+    m3uUrl: client.m3uUrl || `${xtreamHost}/get.php?username=${client.username}&password=${client.password}&type=m3u_plus`,
+    xtreamHost,
+    expiresAt: client.expiresAt,
+    maxConnections: client.maxConnections,
+  };
+
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Content-Disposition', `attachment; filename="${client.username}-credentials.json"`);
+  res.json(credentials);
+});
+
 // POST /api/clients/bulk
 router.post('/bulk', async (req: AuthRequest, res: Response): Promise<void> => {
   const { ids, action, days } = z.object({

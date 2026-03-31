@@ -88,6 +88,11 @@ model Client {
   lastSeen        DateTime?
   deviceCount     Int        @default(0)
   notes           String?
+  isBanned        Boolean   @default(false)
+  isTest          Boolean   @default(false)
+  currentIp       String?
+  currentChannel  String?
+  blocksCount     Int       @default(0)
   bouquets        String[]
 
   ownerId         String
@@ -519,4 +524,56 @@ model IsrBlock {
   reason    String?
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
+}
+
+model IpBlock {
+  id        String   @id @default(uuid())
+  value     String   @unique  // IP or CIDR range
+  reason    String?
+  blockType String   @default("IP")  // IP, CIDR, ASN, COUNTRY, ISP
+  isActive  Boolean  @default(true)
+  createdBy String?
+  expiresAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([value])
+}
+
+model AsnBlock {
+  id        String   @id @default(uuid())
+  asn       String   @unique  // e.g. "AS12345"
+  asnName   String?
+  reason    String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model CountryBlock {
+  id          String   @id @default(uuid())
+  countryCode String   @unique  // ISO 2-letter code e.g. "RO"
+  countryName String?
+  reason      String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+}
+
+model IspBlock {
+  id        String   @id @default(uuid())
+  ispName   String   @unique
+  reason    String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model ConnectionLog {
+  id          String   @id @default(uuid())
+  clientId    String
+  ipAddress   String
+  userAgent   String?
+  streamName  String?
+  country     String?
+  isp         String?
+  connectedAt DateTime @default(now())
+  duration    Int?     // seconds
+  @@index([clientId])
+  @@index([connectedAt])
 }
