@@ -104,6 +104,8 @@ model Client {
 
   invoices        Invoice[]
   sharingAlerts   SharingAlert[]
+  magDevices      MagDevice[]
+  enigma2Devices  Enigma2Device[]
 
   @@index([ownerId])
   @@index([status])
@@ -259,4 +261,262 @@ model Setting {
   key       String   @unique
   value     Json
   updatedAt DateTime @updatedAt
+}
+
+enum StreamType {
+  LIVE
+  MOVIE
+  SERIES
+  RADIO
+}
+
+enum StreamStatus {
+  ONLINE
+  OFFLINE
+  STOPPED
+  STARTING
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model StreamCategory {
+  id          String      @id @default(uuid())
+  name        String
+  type        StreamType  @default(LIVE)
+  icon        String?
+  sortOrder   Int         @default(0)
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+
+  streams     Stream[]
+  movies      Movie[]
+  series      Series[]
+  radios      RadioStream[]
+}
+
+model Stream {
+  id              String        @id @default(uuid())
+  name            String
+  streamUrl       String
+  icon            String?
+  epgChannelId    String?
+  status          StreamStatus  @default(ONLINE)
+  sortOrder       Int           @default(0)
+  isActive        Boolean       @default(true)
+  notes           String?
+  tvgId           String?
+  tvgName         String?
+  inputBandwidth  Float         @default(0)
+  outputBandwidth Float         @default(0)
+  currentViewers  Int           @default(0)
+  transcodeProfileId String?
+  transcodeProfile   TranscodeProfile? @relation(fields: [transcodeProfileId], references: [id])
+  categoryId      String?
+  category        StreamCategory? @relation(fields: [categoryId], references: [id])
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([status])
+  @@index([categoryId])
+}
+
+model Movie {
+  id           String        @id @default(uuid())
+  name         String
+  streamUrl    String
+  icon         String?
+  description  String?
+  releaseYear  Int?
+  rating       Float?
+  duration     Int?
+  tmdbId       String?
+  genre        String[]
+  isActive     Boolean       @default(true)
+  views        Int           @default(0)
+  categoryId   String?
+  category     StreamCategory? @relation(fields: [categoryId], references: [id])
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([categoryId])
+}
+
+model Series {
+  id           String        @id @default(uuid())
+  name         String
+  icon         String?
+  description  String?
+  releaseYear  Int?
+  rating       Float?
+  tmdbId       String?
+  genre        String[]
+  isActive     Boolean       @default(true)
+  categoryId   String?
+  category     StreamCategory? @relation(fields: [categoryId], references: [id])
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  episodes     Episode[]
+
+  @@index([categoryId])
+}
+
+model Episode {
+  id         String   @id @default(uuid())
+  title      String
+  streamUrl  String
+  season     Int      @default(1)
+  episode    Int      @default(1)
+  duration   Int?
+  tmdbId     String?
+  seriesId   String
+  series     Series   @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([seriesId])
+}
+
+model RadioStream {
+  id         String        @id @default(uuid())
+  name       String
+  streamUrl  String
+  icon       String?
+  country    String?
+  language   String?
+  genre      String?
+  isActive   Boolean       @default(true)
+  categoryId String?
+  category   StreamCategory? @relation(fields: [categoryId], references: [id])
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+}
+
+model EpgSource {
+  id        String   @id @default(uuid())
+  name      String
+  url       String
+  isActive  Boolean  @default(true)
+  lastFetch DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TranscodeProfile {
+  id         String   @id @default(uuid())
+  name       String   @unique
+  videoCodec String   @default("copy")
+  audioCodec String   @default("copy")
+  resolution String?
+  bitrate    String?
+  extraArgs  String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  streams    Stream[]
+}
+
+model MagDevice {
+  id           String   @id @default(uuid())
+  clientId     String?
+  client       Client?  @relation(fields: [clientId], references: [id])
+  macAddress   String   @unique
+  model        String?
+  imageVersion String?
+  ipAddress    String?
+  lastSeen     DateTime?
+  isActive     Boolean  @default(true)
+  isLocked     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([clientId])
+}
+
+model Enigma2Device {
+  id           String   @id @default(uuid())
+  clientId     String?
+  client       Client?  @relation(fields: [clientId], references: [id])
+  macAddress   String   @unique
+  model        String?
+  ipAddress    String?
+  lastSeen     DateTime?
+  isActive     Boolean  @default(true)
+  isLocked     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([clientId])
+}
+
+model SupportTicket {
+  id          String         @id @default(uuid())
+  subject     String
+  message     String
+  status      TicketStatus   @default(OPEN)
+  priority    TicketPriority @default(MEDIUM)
+  clientName  String?
+  clientEmail String?
+  assignedTo  String?
+  response    String?
+  resolvedAt  DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+model CreditLog {
+  id            String   @id @default(uuid())
+  userId        String
+  amount        Float
+  type          String
+  description   String?
+  balanceBefore Float
+  balanceAfter  Float
+  createdAt     DateTime @default(now())
+
+  @@index([userId])
+}
+
+model LiveConnection {
+  id          String   @id @default(uuid())
+  clientId    String?
+  username    String
+  ipAddress   String
+  userAgent   String?
+  streamName  String?
+  country     String?
+  bandwidth   Float    @default(0)
+  connectedAt DateTime @default(now())
+  lastSeen    DateTime @default(now())
+
+  @@index([clientId])
+}
+
+model UserAgentBlock {
+  id        String   @id @default(uuid())
+  pattern   String   @unique
+  reason    String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model IsrBlock {
+  id        String   @id @default(uuid())
+  country   String?
+  isp       String?
+  reason    String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
 }
