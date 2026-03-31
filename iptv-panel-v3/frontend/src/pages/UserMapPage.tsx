@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
 import { Globe, Users, MapPin, Wifi } from 'lucide-react';
-import { format } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';

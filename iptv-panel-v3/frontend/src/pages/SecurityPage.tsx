@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/use-toast';
 import api from '@/lib/api';
-import type { FirewallRule, SharingAlert, ApiKey, Session } from '@/types';
+import type { SharingAlert, ApiKey, Session } from '@/types';
 
 interface IpBlock {
   id: string;
@@ -73,10 +73,6 @@ function countryToFlag(code: string): string {
 export default function SecurityPage() {
   const qc = useQueryClient();
 
-  // Firewall (legacy)
-  const [addRuleOpen, setAddRuleOpen] = useState(false);
-  const [ruleForm, setRuleForm] = useState({ type: 'BLACKLIST', value: '', reason: '' });
-
   // IP Blocks
   const [addIpBlockOpen, setAddIpBlockOpen] = useState(false);
   const [ipBlockForm, setIpBlockForm] = useState({ value: '', reason: '', blockType: 'IP' });
@@ -105,7 +101,6 @@ export default function SecurityPage() {
   const [geoError, setGeoError] = useState('');
 
   // Queries
-  const { data: rules, isLoading: rulesLoading } = useQuery<FirewallRule[]>({ queryKey: ['firewall'], queryFn: () => api.get('/security/firewall').then(r => r.data) });
   const { data: ipBlocks, isLoading: ipBlocksLoading } = useQuery<IpBlock[]>({ queryKey: ['ip-blocks'], queryFn: () => api.get('/security/ip-blocks').then(r => r.data) });
   const { data: countryBlocks, isLoading: countryBlocksLoading } = useQuery<CountryBlock[]>({ queryKey: ['country-blocks'], queryFn: () => api.get('/security/country-blocks').then(r => r.data) });
   const { data: asnBlocks, isLoading: asnBlocksLoading } = useQuery<AsnBlock[]>({ queryKey: ['asn-blocks'], queryFn: () => api.get('/security/asn-blocks').then(r => r.data) });
@@ -113,13 +108,6 @@ export default function SecurityPage() {
   const { data: alerts, isLoading: alertsLoading } = useQuery<SharingAlert[]>({ queryKey: ['sharing-alerts'], queryFn: () => api.get('/security/sharing-alerts').then(r => r.data) });
   const { data: apiKeys, isLoading: keysLoading } = useQuery<ApiKey[]>({ queryKey: ['api-keys'], queryFn: () => api.get('/security/api-keys').then(r => r.data) });
   const { data: sessions } = useQuery<Session[]>({ queryKey: ['sessions'], queryFn: () => api.get('/security/sessions').then(r => r.data) });
-
-  // Mutations - Firewall
-  const addRuleMutation = useMutation({
-    mutationFn: (d: typeof ruleForm) => api.post('/security/firewall', d),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['firewall'] }); toast({ title: 'Rule added' }); setAddRuleOpen(false); setRuleForm({ type: 'BLACKLIST', value: '', reason: '' }); },
-  });
-  const deleteRuleMutation = useMutation({ mutationFn: (id: string) => api.delete(`/security/firewall/${id}`), onSuccess: () => qc.invalidateQueries({ queryKey: ['firewall'] }) });
 
   // Mutations - IP Blocks
   const addIpBlockMutation = useMutation({
