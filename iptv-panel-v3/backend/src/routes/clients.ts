@@ -29,7 +29,7 @@ const updateSchema = createSchema.partial().omit({ username: true });
 
 // GET /api/clients
 router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
-  const { page = 1, limit = 25, search, status, planId } = req.query as Record<string, string>;
+  const { page = '1', limit = '25', search, status, planId } = req.query as Record<string, string>;
   const skip = (parseInt(page) - 1) * parseInt(limit);
 
   const where: Record<string, unknown> = {};
@@ -42,14 +42,14 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
     prisma.client.findMany({
       where,
       skip,
-      take: parseInt(limit),
+      take: parseInt(limit as string),
       orderBy: { createdAt: 'desc' },
       include: { plan: { select: { id: true, name: true } }, server: { select: { id: true, name: true } } },
     }),
     prisma.client.count({ where }),
   ]);
 
-  res.json({ data: clients, total, page: parseInt(page), limit: parseInt(limit), pages: Math.ceil(total / parseInt(limit)) });
+  res.json({ data: clients, total, page: parseInt(page as string), limit: parseInt(limit as string), pages: Math.ceil(total / parseInt(limit as string)) });
 });
 
 // POST /api/clients
