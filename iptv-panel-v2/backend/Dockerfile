@@ -8,11 +8,11 @@ RUN chmod +x /usr/local/bin/install-php-extensions \
 
 WORKDIR /var/www/html
 
-# Install deps first (--no-scripts so artisan is not required yet)
+# Install deps first without scripts (artisan not available yet)
 COPY composer.json composer.lock* ./
 RUN composer install --no-interaction --prefer-dist --no-scripts
 
-# Copy full source, then finalize autoload
+# Copy full source, finalize autoload
 COPY . .
 RUN composer dump-autoload --optimize \
     && chmod -R 775 storage bootstrap/cache
@@ -21,5 +21,5 @@ EXPOSE 8000
 
 CMD php artisan config:clear; \
     php artisan migrate --force; \
-    php artisan db:seed --force; \
+    php artisan db:seed --force --class=DatabaseSeeder; \
     php artisan serve --host=0.0.0.0 --port=8000

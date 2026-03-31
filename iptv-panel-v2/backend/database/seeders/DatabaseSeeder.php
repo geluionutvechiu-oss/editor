@@ -9,6 +9,11 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
+        // Only seed if no users exist yet (idempotent on container restart)
+        if (User::count() > 0) {
+            return;
+        }
+
         $this->call([
             UserSeeder::class,
             PackageSeeder::class,
