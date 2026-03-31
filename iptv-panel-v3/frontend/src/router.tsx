@@ -23,6 +23,7 @@ import TranscodingPage from './pages/TranscodingPage';
 import DevicesPage from './pages/DevicesPage';
 import TicketsPage from './pages/TicketsPage';
 import CreditsPage from './pages/CreditsPage';
+import UserMapPage from './pages/UserMapPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuthStore();
@@ -40,8 +41,11 @@ export const router = createBrowserRouter([
       { path: 'dashboard', element: <DashboardPage /> },
       { path: 'connections', element: <LiveConnectionsPage /> },
       { path: 'clients', element: <ClientsPage /> },
+      { path: 'clients/add', element: <ClientsPage /> },
+      { path: 'clients/bulk', element: <ClientsPage /> },
       { path: 'plans', element: <PlansPage /> },
       { path: 'resellers', element: <ResellersPage /> },
+      { path: 'resellers/add', element: <ResellersPage /> },
       { path: 'invoices', element: <InvoicesPage /> },
       { path: 'credits', element: <CreditsPage /> },
       { path: 'streams', element: <StreamsPage /> },
@@ -54,10 +58,15 @@ export const router = createBrowserRouter([
       { path: 'transcoding', element: <TranscodingPage /> },
       { path: 'devices/mag', element: <DevicesPage /> },
       { path: 'devices/enigma2', element: <DevicesPage /> },
+      { path: 'devices/events', element: <DevicesPage /> },
       { path: 'security', element: <SecurityPage /> },
       { path: 'tickets', element: <TicketsPage /> },
       { path: 'notifications', element: <NotificationsPage /> },
+      { path: 'subscription-messages', element: <NotificationsPage /> },
       { path: 'audit-logs', element: <AuditLogsPage /> },
+      { path: 'audit-logs/credits', element: <AuditLogsPage /> },
+      { path: 'stats/map', element: <UserMapPage /> },
+      { path: 'stats/credits', element: <CreditsPage /> },
       { path: 'settings', element: <SettingsPage /> },
     ],
   },

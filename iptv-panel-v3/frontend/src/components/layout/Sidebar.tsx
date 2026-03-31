@@ -1,21 +1,35 @@
 import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, Activity, ShoppingCart, Users, Tv, Package,
-  BarChart2, FileText, Bell, LifeBuoy, LogOut, ChevronLeft,
-  ChevronRight, ChevronDown, Tv2,
+  LayoutDashboard,
+  Activity,
+  ShoppingCart,
+  Users,
+  Tv,
+  Tv2,
+  Package,
+  BarChart2,
+  FileText,
+  Bell,
+  LifeBuoy,
+  LogOut,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
 
-interface SidebarProps {
+// ── props ─────────────────────────────────────────────────────────────────────
+
+export interface SidebarProps {
   collapsed: boolean;
   onToggle: () => void;
 }
 
-// ── types ────────────────────────────────────────────────────────────────────
+// ── types ─────────────────────────────────────────────────────────────────────
 
 interface SubItem {
   to: string;
@@ -31,10 +45,8 @@ interface ExpandableSection {
   id: string;
   label: string;
   Icon: React.ElementType;
-  /** Routes that, when active, should auto-open this section */
   matchPrefixes: string[];
   subGroups?: SubGroup[];
-  /** flat items (no group header) */
   items?: SubItem[];
 }
 
@@ -45,7 +57,9 @@ interface DirectLink {
   badge?: 'notifications' | 'tickets';
 }
 
-type NavEntry = { type: 'direct'; data: DirectLink } | { type: 'expandable'; data: ExpandableSection };
+type NavEntry =
+  | { type: 'direct'; data: DirectLink }
+  | { type: 'expandable'; data: ExpandableSection };
 
 // ── nav structure ─────────────────────────────────────────────────────────────
 
@@ -64,7 +78,13 @@ const navStructure: NavEntry[] = [
       id: 'abonamente',
       label: 'Abonamente',
       Icon: ShoppingCart,
-      matchPrefixes: ['/clients', '/devices/mag', '/devices/enigma2', '/devices/events', '/subscription-messages'],
+      matchPrefixes: [
+        '/clients',
+        '/devices/mag',
+        '/devices/enigma2',
+        '/devices/events',
+        '/subscription-messages',
+      ],
       subGroups: [
         {
           groupLabel: 'Utilizatori',
@@ -128,9 +148,7 @@ const navStructure: NavEntry[] = [
       label: 'Pachete',
       Icon: Package,
       matchPrefixes: ['/plans'],
-      items: [
-        { to: '/plans', label: 'Gestionare Pachete' },
-      ],
+      items: [{ to: '/plans', label: 'Gestionare Pachete' }],
     },
   },
   {
@@ -143,15 +161,11 @@ const navStructure: NavEntry[] = [
       subGroups: [
         {
           groupLabel: 'Hartă Utilizator',
-          items: [
-            { to: '/stats/map', label: 'Hartă Utilizator Live' },
-          ],
+          items: [{ to: '/stats/map', label: 'Hartă Utilizator Live' }],
         },
         {
           groupLabel: 'Credite',
-          items: [
-            { to: '/stats/credits', label: 'Istoricul Creditelor' },
-          ],
+          items: [{ to: '/stats/credits', label: 'Istoricul Creditelor' }],
         },
       ],
     },
@@ -163,18 +177,26 @@ const navStructure: NavEntry[] = [
       label: 'Jurnale',
       Icon: FileText,
       matchPrefixes: ['/audit-logs'],
-      items: [
-        { to: '/audit-logs/credits', label: 'Jurnal Istoricul Credite' },
-      ],
+      items: [{ to: '/audit-logs/credits', label: 'Jurnal Istoricul Credite' }],
     },
   },
   {
     type: 'direct',
-    data: { to: '/notifications', label: 'Notificări', Icon: Bell, badge: 'notifications' },
+    data: {
+      to: '/notifications',
+      label: 'Notificări',
+      Icon: Bell,
+      badge: 'notifications',
+    },
   },
   {
     type: 'direct',
-    data: { to: '/tickets', label: 'Tichete', Icon: LifeBuoy, badge: 'tickets' },
+    data: {
+      to: '/tickets',
+      label: 'Tichete',
+      Icon: LifeBuoy,
+      badge: 'tickets',
+    },
   },
 ];
 
@@ -184,45 +206,49 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const { user, logout } = useAuthStore();
   const location = useLocation();
 
-  // determine which expandable sections should start open (route-based)
-  const initialOpen = () => {
+  // auto-open sections whose route prefix matches current path
+  const computeInitialOpen = (): Record<string, boolean> => {
     const open: Record<string, boolean> = {};
-    navStructure.forEach(entry => {
+    navStructure.forEach((entry) => {
       if (entry.type === 'expandable') {
-        const { id, matchPrefixes } = entry.data as ExpandableSection;
-        if (matchPrefixes.some(prefix => location.pathname.startsWith(prefix))) {
-          open[id] = true;
+        const sec = entry.data as ExpandableSection;
+        if (sec.matchPrefixes.some((p) => location.pathname.startsWith(p))) {
+          open[sec.id] = true;
         }
       }
     });
     return open;
   };
 
-  const [openSections, setOpenSections] = useState<Record<string, boolean>>(initialOpen);
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>(
+    computeInitialOpen
+  );
 
   const toggleSection = (id: string) => {
-    setOpenSections(prev => ({ ...prev, [id]: !prev[id] }));
+    setOpenSections((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
   const isSubItemActive = (to: string) =>
     location.pathname === to || location.pathname.startsWith(to + '/');
 
-  // badges
+  // ── badge queries ──────────────────────────────────────────────────────────
+
   const { data: notifData } = useQuery({
     queryKey: ['notifications-unread'],
-    queryFn: () => api.get('/notifications?unread=true&limit=1').then(r => r.data),
-    refetchInterval: 30000,
+    queryFn: () =>
+      api.get('/notifications?unread=true&limit=1').then((r) => r.data),
+    refetchInterval: 30_000,
   });
 
   const { data: ticketData } = useQuery({
     queryKey: ['tickets-open'],
-    queryFn: () => api.get('/tickets?status=OPEN').then(r => r.data),
-    refetchInterval: 60000,
+    queryFn: () => api.get('/tickets?status=OPEN').then((r) => r.data),
+    refetchInterval: 60_000,
     enabled: user?.role === 'ADMIN',
   });
 
-  const unreadCount: number = notifData?.unreadCount || 0;
-  const openTickets: number = ticketData?.total || 0;
+  const unreadCount: number = notifData?.unreadCount ?? 0;
+  const openTickets: number = ticketData?.total ?? 0;
 
   const getBadgeCount = (badge?: 'notifications' | 'tickets') => {
     if (badge === 'notifications') return unreadCount;
@@ -230,15 +256,20 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
     return 0;
   };
 
+  // ── render ────────────────────────────────────────────────────────────────
+
   return (
     <div
-      className="h-full flex flex-col"
-      style={{ background: '#1a2332', borderRight: '1px solid rgba(255,255,255,0.06)' }}
+      className="h-full flex flex-col select-none"
+      style={{
+        background: '#1a2332',
+        borderRight: '1px solid rgba(255,255,255,0.06)',
+      }}
     >
       {/* ── Logo ── */}
       <div
         className={cn(
-          'flex items-center h-16 border-b border-white/[0.05] px-4',
+          'flex items-center h-16 border-b border-white/[0.05] px-4 flex-shrink-0',
           collapsed ? 'justify-center' : 'gap-3'
         )}
       >
@@ -265,23 +296,34 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
             'flex-shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all',
             collapsed ? 'ml-0' : 'ml-auto'
           )}
+          aria-label={
+            collapsed ? 'Extinde bara laterală' : 'Restrânge bara laterală'
+          }
         >
-          {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
+          {collapsed ? (
+            <ChevronRight className="h-3.5 w-3.5" />
+          ) : (
+            <ChevronLeft className="h-3.5 w-3.5" />
+          )}
         </button>
       </div>
 
-      {/* ── Nav ── */}
+      {/* ── Navigation ── */}
       <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
-        {navStructure.map((entry, idx) => {
+        {navStructure.map((entry) => {
+          // ── Direct link ──────────────────────────────────────────────────
           if (entry.type === 'direct') {
             const { to, label, Icon, badge } = entry.data as DirectLink;
-            const isActive = location.pathname === to || location.pathname.startsWith(to + '/');
+            const isActive =
+              location.pathname === to ||
+              location.pathname.startsWith(to + '/');
             const count = getBadgeCount(badge);
 
             return (
               <NavLink
                 key={to}
                 to={to}
+                title={collapsed ? label : undefined}
                 className={cn(
                   'flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-150 group relative',
                   isActive
@@ -295,12 +337,16 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
                     isActive ? 'text-blue-400' : 'group-hover:text-blue-400'
                   )}
                 />
-                {!collapsed && <span className="truncate flex-1">{label}</span>}
+                {!collapsed && (
+                  <span className="truncate flex-1">{label}</span>
+                )}
                 {count > 0 && (
                   <span
                     className={cn(
                       'flex-shrink-0 h-4 min-w-[1rem] px-1 rounded-full text-[9px] font-bold text-white flex items-center justify-center',
-                      badge === 'notifications' ? 'bg-blue-500' : 'bg-orange-500',
+                      badge === 'notifications'
+                        ? 'bg-blue-500'
+                        : 'bg-orange-500',
                       collapsed ? 'absolute -top-0.5 -right-0.5' : ''
                     )}
                   >
@@ -311,13 +357,15 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
             );
           }
 
-          // expandable
+          // ── Expandable section ────────────────────────────────────────────
           const section = entry.data as ExpandableSection;
           const { id, label, Icon, matchPrefixes, subGroups, items } = section;
-          const isSectionActive = matchPrefixes.some(p => location.pathname.startsWith(p));
+          const isSectionActive = matchPrefixes.some((p) =>
+            location.pathname.startsWith(p)
+          );
           const isOpen = !!openSections[id];
 
-          // collect all sub-items for sub-item rendering
+          // normalise to SubGroup array for uniform rendering
           const allGroups: SubGroup[] = subGroups
             ? subGroups
             : items
@@ -326,9 +374,10 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
           return (
             <div key={id}>
-              {/* Section header / trigger */}
+              {/* Section trigger button */}
               <button
                 onClick={() => !collapsed && toggleSection(id)}
+                title={collapsed ? label : undefined}
                 className={cn(
                   'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-150 group',
                   isSectionActive
@@ -340,7 +389,9 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 <Icon
                   className={cn(
                     'h-4 w-4 flex-shrink-0 transition-colors',
-                    isSectionActive ? 'text-blue-400' : 'group-hover:text-blue-400'
+                    isSectionActive
+                      ? 'text-blue-400'
+                      : 'group-hover:text-blue-400'
                   )}
                 />
                 {!collapsed && (
@@ -356,7 +407,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 )}
               </button>
 
-              {/* Sub-items (only when expanded and not collapsed) */}
+              {/* Sub-items — hidden when sidebar is collapsed */}
               {isOpen && !collapsed && (
                 <div className="mt-0.5 mb-1 ml-2 space-y-0.5">
                   {allGroups.map((group, gIdx) => (
@@ -366,7 +417,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
                           {group.groupLabel}
                         </div>
                       )}
-                      {group.items.map(subItem => {
+                      {group.items.map((subItem) => {
                         const active = isSubItemActive(subItem.to);
                         return (
                           <NavLink
@@ -392,8 +443,8 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
         })}
       </nav>
 
-      {/* ── User + Logout ── */}
-      <div className="border-t border-white/[0.05] p-2.5">
+      {/* ── User footer ── */}
+      <div className="border-t border-white/[0.05] p-2.5 flex-shrink-0">
         <div
           className={cn(
             'flex items-center gap-2.5 px-2 py-2 rounded-lg mb-1',
@@ -404,15 +455,17 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
             className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-sm font-bold text-white"
             style={{ background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)' }}
           >
-            {user?.username?.[0]?.toUpperCase()}
+            {user?.username?.[0]?.toUpperCase() ?? '?'}
           </div>
           {!collapsed && (
             <div className="flex-1 min-w-0">
-              <div className="text-[13px] font-semibold truncate">{user?.username}</div>
+              <div className="text-[13px] font-semibold truncate">
+                {user?.username}
+              </div>
               <div className="text-[10px] text-muted-foreground truncate capitalize flex items-center gap-1">
                 <span
                   className={cn(
-                    'inline-block w-1.5 h-1.5 rounded-full',
+                    'inline-block w-1.5 h-1.5 rounded-full flex-shrink-0',
                     user?.role === 'ADMIN' ? 'bg-blue-400' : 'bg-green-400'
                   )}
                 />
@@ -423,7 +476,11 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
         </div>
 
         <button
-          onClick={() => { logout(); window.location.href = '/login'; }}
+          onClick={() => {
+            logout();
+            window.location.href = '/login';
+          }}
+          title={collapsed ? 'Deconectare' : undefined}
           className={cn(
             'flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[13px] text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-all',
             collapsed && 'justify-center'
