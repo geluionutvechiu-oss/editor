@@ -8,13 +8,14 @@ RUN chmod +x /usr/local/bin/install-php-extensions \
 
 WORKDIR /var/www/html
 
-# Install deps first without scripts (artisan not available yet)
 COPY composer.json composer.lock* ./
 RUN composer install --no-interaction --prefer-dist --no-scripts
 
-# Copy full source, finalize autoload
 COPY . .
-RUN composer dump-autoload --optimize \
+
+# Create .env from environment (Laravel requires the file to exist)
+RUN echo "APP_NAME=IPTVPanel" > .env \
+    && composer dump-autoload --optimize \
     && chmod -R 775 storage bootstrap/cache
 
 EXPOSE 8000

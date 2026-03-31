@@ -16,7 +16,6 @@ return Application::configure(basePath: dirname(__DIR__))
             'jwt.refresh' => \Tymon\JWTAuth\Http\Middleware\RefreshToken::class,
             'role' => \App\Http\Middleware\RoleMiddleware::class,
         ]);
-        $middleware->statefulApi();
     })
     ->withExceptions(function (Exceptions $exceptions) {
         $exceptions->render(function (\Tymon\JWTAuth\Exceptions\TokenExpiredException $e) {
