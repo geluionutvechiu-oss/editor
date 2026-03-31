@@ -33,9 +33,9 @@ export default function CategoriesPage() {
   const [editItem, setEditItem] = useState<Category | null>(null);
   const [form, setForm] = useState({ name: '', sortOrder: '0', isActive: true });
 
-  const { data, isLoading } = useQuery<{ data: Category[]; total: number }>({
+  const { data, isLoading } = useQuery<Category[]>({
     queryKey: ['categories', activeTab],
-    queryFn: () => api.get(`/categories?type=${activeTab}&limit=100`).then(r => r.data),
+    queryFn: () => api.get(`/categories?type=${activeTab}&limit=100`).then(r => Array.isArray(r.data) ? r.data : (r.data.data ?? [])),
   });
 
   const saveMutation = useMutation({
@@ -87,19 +87,19 @@ export default function CategoriesPage() {
         <Card className="glass-card stat-glow-blue">
           <CardContent className="p-4">
             <p className="text-muted-foreground text-xs mb-1">Total Categories</p>
-            <p className="text-2xl font-bold text-blue-400">{data?.total ?? '—'}</p>
+            <p className="text-2xl font-bold text-blue-400">{data?.length ?? '—'}</p>
           </CardContent>
         </Card>
         <Card className="glass-card stat-glow-green">
           <CardContent className="p-4">
             <p className="text-muted-foreground text-xs mb-1">Active</p>
-            <p className="text-2xl font-bold text-green-400">{data?.data.filter(c => c.isActive).length ?? '—'}</p>
+            <p className="text-2xl font-bold text-green-400">{data?.filter(c => c.isActive).length ?? '—'}</p>
           </CardContent>
         </Card>
         <Card className="glass-card stat-glow-purple">
           <CardContent className="p-4">
             <p className="text-muted-foreground text-xs mb-1">Total Items</p>
-            <p className="text-2xl font-bold text-purple-400">{data?.data.reduce((a, c) => a + (c.itemCount || 0), 0) ?? '—'}</p>
+            <p className="text-2xl font-bold text-purple-400">{data?.reduce((a, c) => a + (c.itemCount || 0), 0) ?? '—'}</p>
           </CardContent>
         </Card>
       </div>
@@ -109,7 +109,7 @@ export default function CategoriesPage() {
           <CardTitle className="flex items-center gap-2">
             <activeTabDef.icon className={`h-4 w-4 ${activeTabDef.color}`} />
             {activeTabDef.label} Categories
-            <span className="ml-auto text-sm font-normal text-muted-foreground">{data?.total ?? 0} categories</span>
+            <span className="ml-auto text-sm font-normal text-muted-foreground">{data?.length ?? 0} categories</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -124,7 +124,7 @@ export default function CategoriesPage() {
                 <div className="w-20 text-center">Status</div>
                 <div className="w-16 text-right">Actions</div>
               </div>
-              {data?.data.sort((a, b) => a.sortOrder - b.sortOrder).map((cat, idx) => (
+              {[...(data ?? [])].sort((a, b) => a.sortOrder - b.sortOrder).map((cat, idx) => (
                 <div key={cat.id} className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-4 items-center px-3 py-3 rounded-lg table-row-hover group transition-colors">
                   <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0">
                     <span className="text-xs text-muted-foreground font-mono">{cat.sortOrder || idx + 1}</span>
@@ -147,7 +147,7 @@ export default function CategoriesPage() {
                   </div>
                 </div>
               ))}
-              {!data?.data.length && !isLoading && (
+              {!data?.length && !isLoading && (
                 <div className="text-center py-16 text-muted-foreground">
                   <Folder className="h-10 w-10 mx-auto mb-3 opacity-30" />
                   <p>No {activeTabDef.label.toLowerCase()} categories yet</p>

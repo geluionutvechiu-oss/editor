@@ -25,7 +25,19 @@ export default function InvoicesPage() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['invoices'] }); toast({ title: 'Invoice marked as paid' }); },
   });
 
-  const downloadPDF = (id: string) => window.open(`/api/invoices/${id}/pdf`, '_blank');
+  const downloadPDF = async (id: string) => {
+    try {
+      const resp = await api.get(`/invoices/${id}/pdf`, { responseType: 'blob' });
+      const url = URL.createObjectURL(resp.data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `invoice-${id}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast({ title: 'Failed to download PDF', variant: 'destructive' });
+    }
+  };
 
   const statusVariant = (s: string): 'paid' | 'pending' | 'overdue' => ({ PAID: 'paid', PENDING: 'pending', OVERDUE: 'overdue' }[s] as 'paid' | 'pending' | 'overdue') || 'pending';
 

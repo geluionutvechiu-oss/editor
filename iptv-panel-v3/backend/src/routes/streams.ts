@@ -13,11 +13,27 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
   if (search) where.name = { contains: search, mode: 'insensitive' };
   if (status) where.status = status;
   if (categoryId) where.categoryId = categoryId;
+  if (type) where.type = type;
   const [streams, total] = await Promise.all([
     prisma.stream.findMany({ where, skip, take: parseInt(limit), orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }], include: { category: { select: { id: true, name: true } }, transcodeProfile: { select: { id: true, name: true } } } }),
     prisma.stream.count({ where }),
   ]);
   res.json({ data: streams, total, page: parseInt(page), limit: parseInt(limit) });
+});
+
+// GET /api/streams/proxy-m3u?url=... — fetch M3U server-side (avoids CORS)
+router.get('/proxy-m3u', async (req: AuthRequest, res: Response): Promise<void> => {
+  const { url } = req.query as { url: string };
+  if (!url) { res.status(400).json({ error: 'url required' }); return; }
+  try {
+    const resp = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(15000) });
+    if (!resp.ok) { res.status(502).json({ error: `Upstream returned ${resp.status}` }); return; }
+    const text = await resp.text();
+    res.setHeader('Content-Type', 'text/plain');
+    res.send(text);
+  } catch (e: any) {
+    res.status(502).json({ error: e.message || 'Fetch failed' });
+  }
 });
 
 router.get('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
